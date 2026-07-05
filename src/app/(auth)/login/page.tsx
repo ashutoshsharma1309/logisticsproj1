@@ -14,11 +14,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { loginSchema, type LoginValues } from "@/lib/validators";
-import { sleep } from "@/lib/utils";
+import { useAuth } from "@/components/providers/auth-provider";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { signIn, status } = useAuth();
   const [showPassword, setShowPassword] = React.useState(false);
+
+  React.useEffect(() => {
+    if (status === "authed") router.replace("/dashboard");
+  }, [status, router]);
 
   const {
     register,
@@ -31,11 +36,17 @@ export default function LoginPage() {
   });
 
   async function onSubmit(values: LoginValues) {
-    await sleep(900);
-    toast.success(`Welcome back, ${values.email.split("@")[0]}`, {
-      description: "Routing you to your control tower.",
-    });
-    router.push("/dashboard");
+    try {
+      const account = signIn(values.email, values.password);
+      toast.success(`Welcome back, ${account.name.split(" ")[0]}`, {
+        description: "Routing you to your control tower.",
+      });
+      router.push("/dashboard");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to sign in", {
+        description: "No account yet? Create one — it takes a few seconds.",
+      });
+    }
   }
 
   return (

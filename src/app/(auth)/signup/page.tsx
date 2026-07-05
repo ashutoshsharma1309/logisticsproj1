@@ -15,7 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { signupSchema, type SignupValues } from "@/lib/validators";
-import { cn, sleep } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/providers/auth-provider";
 
 interface Strength {
   score: number; // 0-4
@@ -43,7 +44,12 @@ function scorePassword(password: string): Strength {
 
 export default function SignupPage() {
   const router = useRouter();
+  const { signUp, status } = useAuth();
   const [showPassword, setShowPassword] = React.useState(false);
+
+  React.useEffect(() => {
+    if (status === "authed") router.replace("/dashboard");
+  }, [status, router]);
 
   const {
     register,
@@ -54,10 +60,11 @@ export default function SignupPage() {
     resolver: zodResolver(signupSchema),
     defaultValues: {
       name: "",
+      company: "",
       email: "",
       password: "",
       confirmPassword: "",
-      role: "manager",
+      role: "admin",
       acceptTerms: true,
     },
   });
@@ -66,11 +73,21 @@ export default function SignupPage() {
   const strength = React.useMemo(() => scorePassword(passwordValue), [passwordValue]);
 
   async function onSubmit(values: SignupValues) {
-    await sleep(1000);
-    toast.success(`Account created for ${values.name}`, {
-      description: "Spinning up your ChainRoute workspace.",
-    });
-    router.push("/dashboard");
+    try {
+      signUp({
+        name: values.name,
+        company: values.company,
+        email: values.email,
+        password: values.password,
+        role: values.role,
+      });
+      toast.success(`Welcome, ${values.name.split(" ")[0]}!`, {
+        description: "Let's set up your workspace.",
+      });
+      router.push("/onboarding");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create account");
+    }
   }
 
   return (
@@ -94,6 +111,21 @@ export default function SignupPage() {
             />
             {errors.name && (
               <p className="text-xs font-medium text-destructive">{errors.name.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="company">Company name</Label>
+            <Input
+              id="company"
+              type="text"
+              autoComplete="organization"
+              placeholder="Acme Logistics"
+              aria-invalid={!!errors.company}
+              {...register("company")}
+            />
+            {errors.company && (
+              <p className="text-xs font-medium text-destructive">{errors.company.message}</p>
             )}
           </div>
 
