@@ -31,7 +31,7 @@ export const DASHBOARD_NAV: NavSection[] = [
     label: "Overview",
     items: [
       { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { title: "AI Insights", href: "/dashboard/ai", icon: Brain, badge: "8" },
+      { title: "AI Insights", href: "/dashboard/ai", icon: Brain },
       { title: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
     ],
   },
