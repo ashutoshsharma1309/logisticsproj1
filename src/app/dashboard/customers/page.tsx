@@ -1,44 +1,47 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Users,
-  Package,
-  DollarSign,
-  Smile,
+  Contact,
   Plus,
-  MoreHorizontal,
-  Eye,
-  Download,
-  BellRing,
-  LifeBuoy,
+  Pencil,
+  Trash2,
   Mail,
-  MessageSquareText,
-  Send,
-  Truck,
+  Phone,
+  MapPin,
+  Package,
+  Receipt,
   FileText,
+  CheckCircle2,
+  MoreHorizontal,
+  Building2,
 } from "lucide-react";
 import { toast } from "sonner";
+
+import { useAuth } from "@/components/providers/auth-provider";
+import { useCollection } from "@/hooks/use-collection";
+import { shipmentCost } from "@/lib/domain/calc";
+import { INVOICE_STATUSES } from "@/config/options";
+import { formatCurrency, formatDate, initials } from "@/lib/utils";
+import type { Customer, Invoice, Shipment, InvoiceStatus } from "@/lib/db/types";
+
 import { PageHeader } from "@/components/shared/page-header";
-import { FadeIn, StaggerGroup, StaggerItem } from "@/components/shared/motion";
+import { EmptyState } from "@/components/shared/empty-state";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FadeIn, StaggerGroup, StaggerItem } from "@/components/shared/motion";
+import { Field, NativeSelect } from "@/components/form/field";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/components/ui/tabs";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Table,
   TableHeader,
@@ -48,16 +51,10 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogFooter,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -69,708 +66,1020 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { getStore } from "@/services/store";
-import {
-  cn,
-  formatCurrency,
-  formatDate,
-  formatNumber,
-  initials,
-} from "@/lib/utils";
-import type { Customer, Invoice } from "@/types";
 import type { ComponentProps } from "react";
 
 type BadgeVariant = ComponentProps<typeof Badge>["variant"];
-type TierVariant = BadgeVariant;
-type InvoiceVariant = BadgeVariant;
 
-const TIER_VARIANT: Record<Customer["tier"], TierVariant> = {
-  enterprise: "accent",
-  business: "default",
-  starter: "muted",
-};
-
-const INVOICE_VARIANT: Record<Invoice["status"], InvoiceVariant> = {
+const INVOICE_VARIANT: Record<InvoiceStatus, BadgeVariant> = {
   paid: "success",
-  pending: "warning",
+  sent: "default",
   overdue: "destructive",
   draft: "muted",
 };
 
-interface SupportTicket {
-  id: string;
-  subject: string;
-  priority: "low" | "medium" | "high";
-  status: "open" | "pending" | "resolved";
-  updated: string;
-}
+// ---------------------------------------------------------------- customer form
+const customerSchema = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+  company: z.string().optional().default(""),
+  email: z
+    .string()
+    .trim()
+    .email("Enter a valid email")
+    .or(z.literal(""))
+    .optional()
+    .default(""),
+  phone: z.string().optional().default(""),
+  gstin: z.string().optional().default(""),
+  addressLine1: z.string().optional().default(""),
+  city: z.string().optional().default(""),
+  state: z.string().optional().default(""),
+  country: z.string().optional().default(""),
+});
+type CustomerForm = z.infer<typeof customerSchema>;
 
-const MOCK_TICKETS: SupportTicket[] = [
-  {
-    id: "TCK-4821",
-    subject: "Customs hold on CR-2026012 — need documents",
-    priority: "high",
-    status: "open",
-    updated: "2h ago",
-  },
-  {
-    id: "TCK-4809",
-    subject: "Invoice INV-2026-1044 line item dispute",
-    priority: "medium",
-    status: "pending",
-    updated: "5h ago",
-  },
-  {
-    id: "TCK-4788",
-    subject: "Request API rate-limit increase for webhooks",
-    priority: "low",
-    status: "resolved",
-    updated: "1d ago",
-  },
-  {
-    id: "TCK-4771",
-    subject: "Cold-chain telemetry export for Q2 shipments",
-    priority: "medium",
-    status: "resolved",
-    updated: "2d ago",
-  },
-];
-
-const TICKET_VARIANT: Record<SupportTicket["status"], InvoiceVariant> = {
-  open: "warning",
-  pending: "default",
-  resolved: "success",
+const EMPTY_CUSTOMER: CustomerForm = {
+  name: "",
+  company: "",
+  email: "",
+  phone: "",
+  gstin: "",
+  addressLine1: "",
+  city: "",
+  state: "",
+  country: "",
 };
 
-const PRIORITY_VARIANT: Record<SupportTicket["priority"], InvoiceVariant> = {
-  high: "destructive",
-  medium: "warning",
-  low: "muted",
-};
+// ---------------------------------------------------------------- invoice form
+const invoiceSchema = z.object({
+  customerId: z.string().min(1, "Select a customer"),
+  shipmentId: z.string().optional().default(""),
+  subtotal: z.coerce.number().min(0, "Subtotal must be ≥ 0"),
+  taxAmount: z.coerce.number().min(0, "Tax must be ≥ 0"),
+  status: z.enum(["draft", "sent", "paid", "overdue"]),
+  issuedAt: z.string().min(1, "Issue date is required"),
+  dueAt: z.string().min(1, "Due date is required"),
+});
+type InvoiceForm = z.infer<typeof invoiceSchema>;
 
-interface StatItem {
-  label: string;
-  value: string;
-  icon: typeof Users;
-  accent: string;
-}
-
-function KpiStat({ item, delay }: { item: StatItem; delay: number }) {
-  const Icon = item.icon;
-  return (
-    <FadeIn delay={delay}>
-      <Card className="group p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-clay-lg">
-        <div className="flex items-start justify-between">
-          <div
-            className={cn(
-              "grid h-11 w-11 place-items-center rounded-xl shadow-clay-inset",
-              item.accent,
-            )}
-          >
-            <Icon className="h-5 w-5" />
-          </div>
-        </div>
-        <p className="mt-4 text-sm text-muted-foreground">{item.label}</p>
-        <p className="mt-1 text-2xl font-bold tracking-tight">{item.value}</p>
-      </Card>
-    </FadeIn>
-  );
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 export default function CustomersPage() {
-  const router = useRouter();
-  const { customers, invoices, shipments } = getStore();
-
-  const [tier, setTier] = React.useState<string>("all");
-  const [selected, setSelected] = React.useState<Customer | null>(null);
-  const [trackRef, setTrackRef] = React.useState("");
-
-  const visibleCustomers = React.useMemo(
-    () =>
-      tier === "all"
-        ? customers
-        : customers.filter((c) => c.tier === tier),
-    [customers, tier],
+  return (
+    <Suspense fallback={<div className="h-24" />}>
+      <CustomersInner />
+    </Suspense>
   );
+}
 
-  const totalActive = customers.reduce((sum, c) => sum + c.activeShipments, 0);
-  const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpend, 0);
-  const avgSatisfaction =
-    customers.reduce((sum, c) => sum + c.satisfaction, 0) / customers.length;
+function CustomersInner() {
+  const searchParams = useSearchParams();
+  const { org } = useAuth();
+  const currency = org?.currency ?? "USD";
 
-  const billed = invoices.reduce((s, i) => s + i.amount, 0);
-  const paid = invoices
-    .filter((i) => i.status === "paid")
-    .reduce((s, i) => s + i.amount, 0);
-  const pending = invoices
-    .filter((i) => i.status === "pending")
-    .reduce((s, i) => s + i.amount, 0);
-  const overdue = invoices
-    .filter((i) => i.status === "overdue")
-    .reduce((s, i) => s + i.amount, 0);
+  const customersCol = useCollection("customers");
+  const invoicesCol = useCollection("invoices");
+  const shipmentsCol = useCollection("shipments");
 
-  const stats: StatItem[] = [
-    {
-      label: "Total customers",
-      value: formatNumber(customers.length),
-      icon: Users,
-      accent: "bg-primary/12 text-primary",
-    },
-    {
-      label: "Active shipments",
-      value: formatNumber(totalActive),
-      icon: Package,
-      accent: "bg-secondary/15 text-secondary",
-    },
-    {
-      label: "Total revenue",
-      value: formatCurrency(totalRevenue),
-      icon: DollarSign,
-      accent: "bg-success/15 text-success",
-    },
-    {
-      label: "Avg satisfaction",
-      value: `${avgSatisfaction.toFixed(1)}%`,
-      icon: Smile,
-      accent: "bg-accent/15 text-accent",
-    },
-  ];
+  const customers = customersCol.items;
+  const invoices = invoicesCol.items;
+  const shipments = shipmentsCol.items;
 
-  const detailShipments = selected
-    ? shipments.filter((s) => s.customer === selected.company).slice(0, 4)
-    : [];
-  const detailInvoices = selected
-    ? invoices.filter((i) => i.customer === selected.company)
-    : [];
+  // dialogs
+  const [customerDialogOpen, setCustomerDialogOpen] = React.useState(false);
+  const [editingCustomer, setEditingCustomer] = React.useState<Customer | null>(
+    null,
+  );
+  const [detail, setDetail] = React.useState<Customer | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<Customer | null>(null);
 
-  function handleTrack(e: React.FormEvent) {
-    e.preventDefault();
-    if (trackRef.trim()) {
-      toast.success(`Locating ${trackRef.trim()}…`, {
-        description: "Opening the live shipments board.",
-      });
-      router.push("/dashboard/shipments");
-    } else {
-      toast.error("Enter a shipment reference to track.");
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = React.useState(false);
+  const [invoiceDeleteTarget, setInvoiceDeleteTarget] =
+    React.useState<Invoice | null>(null);
+
+  // ?new=1 → open create customer dialog on mount
+  const opened = React.useRef(false);
+  React.useEffect(() => {
+    if (opened.current) return;
+    if (searchParams.get("new") !== null) {
+      opened.current = true;
+      setEditingCustomer(null);
+      setCustomerDialogOpen(true);
     }
+  }, [searchParams]);
+
+  function openCreateCustomer() {
+    setEditingCustomer(null);
+    setCustomerDialogOpen(true);
   }
+  function openEditCustomer(c: Customer) {
+    setEditingCustomer(c);
+    setCustomerDialogOpen(true);
+  }
+
+  // per-customer aggregates
+  function shipmentCountFor(id: string): number {
+    return shipments.filter((s) => s.customerId === id).length;
+  }
+  function billedFor(id: string): number {
+    return invoices
+      .filter(
+        (i) =>
+          i.customerId === id && (i.status === "paid" || i.status === "sent"),
+      )
+      .reduce((sum, i) => sum + i.total, 0);
+  }
+
+  function confirmDeleteCustomer() {
+    if (!deleteTarget) return;
+    customersCol.remove(deleteTarget.id, `Deleted customer ${deleteTarget.name}`);
+    toast.success("Customer deleted");
+    setDeleteTarget(null);
+  }
+
+  function confirmDeleteInvoice() {
+    if (!invoiceDeleteTarget) return;
+    invoicesCol.remove(
+      invoiceDeleteTarget.id,
+      `Deleted invoice ${invoiceDeleteTarget.number}`,
+    );
+    toast.success("Invoice deleted");
+    setInvoiceDeleteTarget(null);
+  }
+
+  function markInvoicePaid(inv: Invoice) {
+    invoicesCol.edit(inv.id, { status: "paid" }, `Marked ${inv.number} paid`);
+    toast.success(`${inv.number} marked as paid`);
+  }
+
+  // invoice summary strip
+  const totalBilled = invoices.reduce((s, i) => s + i.total, 0);
+  const totalPaid = invoices
+    .filter((i) => i.status === "paid")
+    .reduce((s, i) => s + i.total, 0);
+  const totalOutstanding = invoices
+    .filter((i) => i.status === "sent" || i.status === "overdue")
+    .reduce((s, i) => s + i.total, 0);
+
+  const customerName = (id: string) =>
+    customers.find((c) => c.id === id)?.name ?? "Unknown";
 
   return (
     <div className="space-y-8">
       <FadeIn>
         <PageHeader
           title="Customers"
-          description="Manage accounts, billing, and support for every shipper on ChainRoute."
+          description="Manage your customer accounts and their invoices."
         >
-          <Select value={tier} onValueChange={setTier}>
-            <SelectTrigger className="w-[150px]" aria-label="Filter by tier">
-              <SelectValue placeholder="All tiers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All tiers</SelectItem>
-              <SelectItem value="enterprise">Enterprise</SelectItem>
-              <SelectItem value="business">Business</SelectItem>
-              <SelectItem value="starter">Starter</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            onClick={() =>
-              toast.success("Add customer", {
-                description: "Customer onboarding flow launched.",
-              })
-            }
-          >
+          <Button onClick={openCreateCustomer}>
             <Plus className="h-4 w-4" />
             Add customer
           </Button>
         </PageHeader>
       </FadeIn>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((item, i) => (
-          <KpiStat key={item.label} item={item} delay={i * 0.06} />
-        ))}
-      </div>
-
       <Tabs defaultValue="customers" className="w-full">
         <TabsList>
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
-          <TabsTrigger value="support">Support</TabsTrigger>
         </TabsList>
 
-        {/* -------------------------------------------------- Customers */}
+        {/* --------------------------------------------------- Customers */}
         <TabsContent value="customers">
-          <StaggerGroup className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {visibleCustomers.map((c) => (
-              <StaggerItem key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelected(c)}
-                  className="w-full text-left"
-                >
-                  <Card className="h-full p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-clay-lg">
+          {customers.length === 0 ? (
+            <FadeIn>
+              <EmptyState
+                icon={Contact}
+                title="Add your first customer"
+                description="Customers you add here can be linked to shipments and invoices."
+                action={
+                  <Button onClick={openCreateCustomer}>
+                    <Plus className="h-4 w-4" />
+                    Add customer
+                  </Button>
+                }
+              />
+            </FadeIn>
+          ) : (
+            <StaggerGroup className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {customers.map((c) => (
+                <StaggerItem key={c.id}>
+                  <Card className="flex h-full flex-col p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-clay-lg">
                     <div className="flex items-start gap-3">
-                      <Avatar className="h-12 w-12 shadow-clay-sm">
-                        <AvatarImage src={c.avatar} alt={c.name} />
-                        <AvatarFallback>{initials(c.name)}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold">{c.name}</p>
-                        <p className="truncate text-sm text-muted-foreground">
-                          {c.company}
-                        </p>
-                      </div>
-                      <Badge
-                        variant={TIER_VARIANT[c.tier]}
-                        className="capitalize"
+                      <button
+                        type="button"
+                        onClick={() => setDetail(c)}
+                        className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                        aria-label={`View ${c.name}`}
                       >
-                        {c.tier}
-                      </Badge>
+                        <Avatar className="h-12 w-12 shadow-clay-sm">
+                          <AvatarFallback>{initials(c.name)}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-semibold">{c.name}</p>
+                          {c.company && (
+                            <p className="truncate text-sm text-muted-foreground">
+                              {c.company}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Actions for ${c.name}`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>{c.name}</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => openEditCustomer(c)}>
+                            <Pencil className="h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:bg-destructive/10"
+                            onClick={() => setDeleteTarget(c)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    <div className="mt-4 space-y-1.5 text-sm text-muted-foreground">
+                      {c.email && (
+                        <p className="flex items-center gap-2">
+                          <Mail className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{c.email}</span>
+                        </p>
+                      )}
+                      {c.phone && (
+                        <p className="flex items-center gap-2">
+                          <Phone className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{c.phone}</span>
+                        </p>
+                      )}
+                      {(c.city || c.country) && (
+                        <p className="flex items-center gap-2">
+                          <MapPin className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">
+                            {[c.city, c.country].filter(Boolean).join(", ")}
+                          </span>
+                        </p>
+                      )}
+                      {c.gstin && (
+                        <p className="flex items-center gap-2">
+                          <Building2 className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">GSTIN {c.gstin}</span>
+                        </p>
+                      )}
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-3">
                       <div className="rounded-xl bg-muted/40 p-3 shadow-clay-inset">
                         <p className="text-xs text-muted-foreground">
-                          Active shipments
+                          Shipments
                         </p>
                         <p className="mt-0.5 text-lg font-bold">
-                          {c.activeShipments}
+                          {shipmentCountFor(c.id)}
                         </p>
                       </div>
                       <div className="rounded-xl bg-muted/40 p-3 shadow-clay-inset">
                         <p className="text-xs text-muted-foreground">
-                          Total spend
+                          Total billed
                         </p>
                         <p className="mt-0.5 text-lg font-bold">
-                          {formatCurrency(c.totalSpend)}
+                          {formatCurrency(billedFor(c.id), currency)}
                         </p>
                       </div>
                     </div>
-
-                    <div className="mt-4 space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">
-                          Satisfaction
-                        </span>
-                        <span className="font-semibold">{c.satisfaction}%</span>
-                      </div>
-                      <Progress value={c.satisfaction} />
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Member since {formatDate(c.since)}</span>
-                      {c.outstandingInvoices > 0 ? (
-                        <Badge variant="warning">
-                          {c.outstandingInvoices} outstanding
-                        </Badge>
-                      ) : (
-                        <Badge variant="success">Settled</Badge>
-                      )}
-                    </div>
                   </Card>
-                </button>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
-        </TabsContent>
-
-        {/* --------------------------------------------------- Invoices */}
-        <TabsContent value="invoices" className="space-y-4">
-          <FadeIn>
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {[
-                { label: "Total billed", value: billed, tone: "text-foreground" },
-                { label: "Paid", value: paid, tone: "text-success" },
-                { label: "Pending", value: pending, tone: "text-warning" },
-                { label: "Overdue", value: overdue, tone: "text-destructive" },
-              ].map((s) => (
-                <Card key={s.label} className="p-4">
-                  <p className="text-xs text-muted-foreground">{s.label}</p>
-                  <p className={cn("mt-1 text-xl font-bold", s.tone)}>
-                    {formatCurrency(s.value)}
-                  </p>
-                </Card>
+                </StaggerItem>
               ))}
-            </div>
-          </FadeIn>
-
-          <FadeIn delay={0.05}>
-            <Card className="overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Issued</TableHead>
-                    <TableHead>Due</TableHead>
-                    <TableHead className="text-center">Items</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((inv) => (
-                    <TableRow key={inv.id}>
-                      <TableCell className="font-medium">{inv.number}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {inv.customer}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        {formatCurrency(inv.amount)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={INVOICE_VARIANT[inv.status]}
-                          className="capitalize"
-                        >
-                          {inv.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(inv.issued)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(inv.due)}
-                      </TableCell>
-                      <TableCell className="text-center">{inv.items}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`Actions for ${inv.number}`}
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>{inv.number}</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() =>
-                                toast.info(`Viewing ${inv.number}`)
-                              }
-                            >
-                              <Eye className="h-4 w-4" />
-                              View
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                toast.success(`Downloading ${inv.number}.pdf`)
-                              }
-                            >
-                              <Download className="h-4 w-4" />
-                              Download
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                toast.success("Reminder sent", {
-                                  description: `${inv.customer} was notified about ${inv.number}.`,
-                                })
-                              }
-                            >
-                              <BellRing className="h-4 w-4" />
-                              Send reminder
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          </FadeIn>
+            </StaggerGroup>
+          )}
         </TabsContent>
 
-        {/* ---------------------------------------------------- Support */}
-        <TabsContent value="support">
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            <FadeIn className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <LifeBuoy className="h-5 w-5 text-primary" />
-                    Open a support ticket
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form
-                    className="space-y-4"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      toast.success("Ticket submitted", {
-                        description: "Our support team will respond within 2 hours.",
-                      });
-                      (e.target as HTMLFormElement).reset();
-                    }}
+        {/* ---------------------------------------------------- Invoices */}
+        <TabsContent value="invoices" className="space-y-4">
+          {invoices.length === 0 ? (
+            <FadeIn>
+              <EmptyState
+                icon={Receipt}
+                title="No invoices yet"
+                description="No invoices yet — create one from a customer or here."
+                action={
+                  <Button
+                    onClick={() => setInvoiceDialogOpen(true)}
+                    disabled={customers.length === 0}
                   >
-                    <div className="space-y-1.5">
-                      <Label htmlFor="ticket-subject">Subject</Label>
-                      <Input
-                        id="ticket-subject"
-                        placeholder="Briefly describe the issue"
-                        required
-                      />
+                    <Plus className="h-4 w-4" />
+                    New invoice
+                  </Button>
+                }
+              />
+            </FadeIn>
+          ) : (
+            <>
+              <FadeIn>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Total billed
+                      </p>
+                      <p className="mt-0.5 text-xl font-bold">
+                        {formatCurrency(totalBilled, currency)}
+                      </p>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="ticket-priority">Priority</Label>
-                      <Select defaultValue="medium">
-                        <SelectTrigger id="ticket-priority">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Paid</p>
+                      <p className="mt-0.5 text-xl font-bold text-success">
+                        {formatCurrency(totalPaid, currency)}
+                      </p>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="ticket-message">Message</Label>
-                      <Textarea
-                        id="ticket-message"
-                        placeholder="Give us the full details so we can help fast…"
-                        required
-                      />
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Outstanding
+                      </p>
+                      <p className="mt-0.5 text-xl font-bold text-warning">
+                        {formatCurrency(totalOutstanding, currency)}
+                      </p>
                     </div>
-                    <Button type="submit">
-                      <Send className="h-4 w-4" />
-                      Submit ticket
-                    </Button>
-                  </form>
-
-                  <Separator className="my-6" />
-
-                  <p className="mb-3 text-sm font-semibold">Recent tickets</p>
-                  <div className="space-y-3">
-                    {MOCK_TICKETS.map((t) => (
-                      <div
-                        key={t.id}
-                        className="flex items-start justify-between gap-3 rounded-xl bg-muted/40 p-3 shadow-clay-inset"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {t.subject}
-                          </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {t.id} · updated {t.updated}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <Badge
-                            variant={TICKET_VARIANT[t.status]}
-                            className="capitalize"
-                          >
-                            {t.status}
-                          </Badge>
-                          <Badge
-                            variant={PRIORITY_VARIANT[t.priority]}
-                            className="capitalize"
-                          >
-                            {t.priority}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            </FadeIn>
+                  <Button onClick={() => setInvoiceDialogOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                    New invoice
+                  </Button>
+                </div>
+              </FadeIn>
 
-            <FadeIn delay={0.08} className="space-y-5">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Truck className="h-5 w-5 text-secondary" />
-                    Track a shipment
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleTrack} className="space-y-3">
-                    <Input
-                      value={trackRef}
-                      onChange={(e) => setTrackRef(e.target.value)}
-                      placeholder="e.g. CR-2026041"
-                      aria-label="Shipment reference"
-                    />
-                    <Button type="submit" variant="secondary" className="w-full">
-                      Track shipment
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BellRing className="h-5 w-5 text-accent" />
-                    Notification preferences
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {[
-                    {
-                      icon: Mail,
-                      label: "Email updates",
-                      desc: "Delivery and exception alerts",
-                      def: true,
-                    },
-                    {
-                      icon: MessageSquareText,
-                      label: "SMS alerts",
-                      desc: "Critical delays only",
-                      def: false,
-                    },
-                    {
-                      icon: BellRing,
-                      label: "Push notifications",
-                      desc: "Real-time milestone pings",
-                      def: true,
-                    },
-                  ].map((row) => {
-                    const Icon = row.icon;
-                    return (
-                      <div
-                        key={row.label}
-                        className="flex items-center justify-between gap-3"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="grid h-9 w-9 place-items-center rounded-lg bg-muted/50 text-muted-foreground shadow-clay-inset">
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{row.label}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {row.desc}
-                            </p>
-                          </div>
-                        </div>
-                        <Switch
-                          defaultChecked={row.def}
-                          onCheckedChange={(v) =>
-                            toast.success(
-                              `${row.label} ${v ? "enabled" : "disabled"}`,
-                            )
-                          }
-                          aria-label={row.label}
-                        />
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </FadeIn>
-          </div>
+              <FadeIn delay={0.05}>
+                <Card className="overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Invoice</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Issued</TableHead>
+                        <TableHead>Due</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invoices.map((inv) => (
+                        <TableRow key={inv.id}>
+                          <TableCell className="font-medium">
+                            {inv.number}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {customerName(inv.customerId)}
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            {formatCurrency(inv.total, currency)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={INVOICE_VARIANT[inv.status]}
+                              className="capitalize"
+                            >
+                              {inv.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(inv.issuedAt)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(inv.dueAt)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={`Actions for ${inv.number}`}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>
+                                  {inv.number}
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  disabled={inv.status === "paid"}
+                                  onClick={() => markInvoicePaid(inv)}
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Mark paid
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:bg-destructive/10"
+                                  onClick={() => setInvoiceDeleteTarget(inv)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              </FadeIn>
+            </>
+          )}
         </TabsContent>
       </Tabs>
 
+      {/* ------------------------------------------- Customer create/edit */}
+      <CustomerDialog
+        open={customerDialogOpen}
+        onOpenChange={setCustomerDialogOpen}
+        editing={editingCustomer}
+        onCreate={(data) => {
+          customersCol.add(data, `Added customer ${data.name}`);
+          toast.success("Customer added");
+        }}
+        onEdit={(id, data) => {
+          customersCol.edit(id, data, `Updated customer ${data.name}`);
+          toast.success("Customer updated");
+        }}
+      />
+
+      {/* ------------------------------------------------ Invoice create */}
+      <InvoiceDialog
+        open={invoiceDialogOpen}
+        onOpenChange={setInvoiceDialogOpen}
+        customers={customers}
+        shipments={shipments}
+        currency={currency}
+        onCreate={(data) => {
+          const number = `INV-${1000 + invoices.length}`;
+          invoicesCol.add(
+            { ...data, number },
+            `Created invoice ${number}`,
+          );
+          toast.success(`Invoice ${number} created`);
+        }}
+      />
+
       {/* ------------------------------------------------ Customer detail */}
-      <Dialog
-        open={selected !== null}
-        onOpenChange={(o) => !o && setSelected(null)}
-      >
+      <Dialog open={detail !== null} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="max-w-xl">
-          {selected && (
+          {detail && (
             <>
               <DialogHeader>
-                <DialogTitle>Customer detail</DialogTitle>
+                <DialogTitle>{detail.name}</DialogTitle>
                 <DialogDescription>
-                  Account overview and recent activity.
+                  {detail.company || "Customer account overview"}
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="flex items-center gap-3">
-                <Avatar className="h-14 w-14 shadow-clay-sm">
-                  <AvatarImage src={selected.avatar} alt={selected.name} />
-                  <AvatarFallback>{initials(selected.name)}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{selected.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {selected.company}
-                  </p>
-                </div>
-                <Badge
-                  variant={TIER_VARIANT[selected.tier]}
-                  className="capitalize"
-                >
-                  {selected.tier}
-                </Badge>
-              </div>
-
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-xl bg-muted/40 p-3 text-center shadow-clay-inset">
-                  <p className="text-xs text-muted-foreground">Spend</p>
+                  <p className="text-xs text-muted-foreground">Shipments</p>
                   <p className="mt-0.5 text-sm font-bold">
-                    {formatCurrency(selected.totalSpend)}
+                    {shipmentCountFor(detail.id)}
                   </p>
                 </div>
                 <div className="rounded-xl bg-muted/40 p-3 text-center shadow-clay-inset">
-                  <p className="text-xs text-muted-foreground">Satisfaction</p>
+                  <p className="text-xs text-muted-foreground">Billed</p>
                   <p className="mt-0.5 text-sm font-bold">
-                    {selected.satisfaction}%
+                    {formatCurrency(billedFor(detail.id), currency)}
                   </p>
                 </div>
                 <div className="rounded-xl bg-muted/40 p-3 text-center shadow-clay-inset">
                   <p className="text-xs text-muted-foreground">Invoices</p>
                   <p className="mt-0.5 text-sm font-bold">
-                    {detailInvoices.length}
+                    {invoices.filter((i) => i.customerId === detail.id).length}
                   </p>
                 </div>
               </div>
 
               <div>
                 <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                  <FileText className="h-4 w-4 text-primary" />
+                  <Package className="h-4 w-4 text-primary" />
                   Recent shipments
                 </p>
-                {detailShipments.length > 0 ? (
+                {shipments.filter((s) => s.customerId === detail.id).length >
+                0 ? (
                   <div className="space-y-2">
-                    {detailShipments.map((s) => (
-                      <div
-                        key={s.id}
-                        className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 p-2.5 shadow-clay-inset"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium">{s.reference}</p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {s.origin.label} → {s.destination.label}
-                          </p>
+                    {shipments
+                      .filter((s) => s.customerId === detail.id)
+                      .slice(0, 5)
+                      .map((s) => (
+                        <div
+                          key={s.id}
+                          className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 p-2.5 shadow-clay-inset"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{s.reference}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {[s.destinationCity, s.destinationCountry]
+                                .filter(Boolean)
+                                .join(", ")}
+                            </p>
+                          </div>
+                          <StatusBadge status={s.status} />
                         </div>
-                        <StatusBadge status={s.status} />
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    No recent shipments on record.
+                    No shipments for this customer yet.
                   </p>
                 )}
               </div>
 
-              <p className="rounded-xl bg-primary/10 p-3 text-xs text-muted-foreground">
-                <Truck className="mr-1.5 inline h-3.5 w-3.5 text-primary" />
-                Track any shipment live from the Shipments board — every
-                milestone is verified on the decentralized ledger.
-              </p>
-
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setSelected(null);
-                  router.push("/dashboard/shipments");
-                }}
-              >
-                Track shipment
-              </Button>
+              <div>
+                <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                  <FileText className="h-4 w-4 text-primary" />
+                  Invoices
+                </p>
+                {invoices.filter((i) => i.customerId === detail.id).length >
+                0 ? (
+                  <div className="space-y-2">
+                    {invoices
+                      .filter((i) => i.customerId === detail.id)
+                      .map((inv) => (
+                        <div
+                          key={inv.id}
+                          className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 p-2.5 shadow-clay-inset"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{inv.number}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Due {formatDate(inv.dueAt)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold">
+                              {formatCurrency(inv.total, currency)}
+                            </span>
+                            <Badge
+                              variant={INVOICE_VARIANT[inv.status]}
+                              className="capitalize"
+                            >
+                              {inv.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No invoices for this customer yet.
+                  </p>
+                )}
+              </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* -------------------------------------------- Delete confirmations */}
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete customer?</DialogTitle>
+            <DialogDescription>
+              Delete {deleteTarget?.name}? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteCustomer}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={invoiceDeleteTarget !== null}
+        onOpenChange={(o) => !o && setInvoiceDeleteTarget(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete invoice?</DialogTitle>
+            <DialogDescription>
+              Delete {invoiceDeleteTarget?.number}? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setInvoiceDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteInvoice}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+// ------------------------------------------------------------ CustomerDialog
+function CustomerDialog({
+  open,
+  onOpenChange,
+  editing,
+  onCreate,
+  onEdit,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  editing: Customer | null;
+  onCreate: (data: Omit<Customer, "id" | "orgId" | "createdAt">) => void;
+  onEdit: (id: string, data: Omit<Customer, "id" | "orgId" | "createdAt">) => void;
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CustomerForm>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: EMPTY_CUSTOMER,
+  });
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (editing) {
+      reset({
+        name: editing.name,
+        company: editing.company,
+        email: editing.email,
+        phone: editing.phone,
+        gstin: editing.gstin,
+        addressLine1: editing.addressLine1,
+        city: editing.city,
+        state: editing.state,
+        country: editing.country,
+      });
+    } else {
+      reset(EMPTY_CUSTOMER);
+    }
+  }, [open, editing, reset]);
+
+  const submit = handleSubmit((values) => {
+    const data: Omit<Customer, "id" | "orgId" | "createdAt"> = {
+      name: values.name.trim(),
+      company: values.company ?? "",
+      email: values.email ?? "",
+      phone: values.phone ?? "",
+      gstin: values.gstin ?? "",
+      addressLine1: values.addressLine1 ?? "",
+      city: values.city ?? "",
+      state: values.state ?? "",
+      country: values.country ?? "",
+    };
+    if (editing) onEdit(editing.id, data);
+    else onCreate(data);
+    onOpenChange(false);
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {editing ? "Edit customer" : "Add customer"}
+          </DialogTitle>
+          <DialogDescription>
+            {editing
+              ? "Update this customer's details."
+              : "Create a new customer record."}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <Field label="Name" htmlFor="c-name" required error={errors.name?.message}>
+            <Input id="c-name" {...register("name")} placeholder="Jane Doe" />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Company" htmlFor="c-company">
+              <Input
+                id="c-company"
+                {...register("company")}
+                placeholder="Acme Corp"
+              />
+            </Field>
+            <Field label="Email" htmlFor="c-email" error={errors.email?.message}>
+              <Input
+                id="c-email"
+                type="email"
+                {...register("email")}
+                placeholder="jane@acme.com"
+              />
+            </Field>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Phone" htmlFor="c-phone">
+              <Input
+                id="c-phone"
+                {...register("phone")}
+                placeholder="+1 555 0100"
+              />
+            </Field>
+            <Field label="GSTIN / Tax ID" htmlFor="c-gstin">
+              <Input id="c-gstin" {...register("gstin")} />
+            </Field>
+          </div>
+          <Field label="Address" htmlFor="c-addr">
+            <Input
+              id="c-addr"
+              {...register("addressLine1")}
+              placeholder="123 Market St"
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="City" htmlFor="c-city">
+              <Input id="c-city" {...register("city")} />
+            </Field>
+            <Field label="State" htmlFor="c-state">
+              <Input id="c-state" {...register("state")} />
+            </Field>
+            <Field label="Country" htmlFor="c-country">
+              <Input id="c-country" {...register("country")} />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit">
+              {editing ? "Save changes" : "Add customer"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ------------------------------------------------------------- InvoiceDialog
+function InvoiceDialog({
+  open,
+  onOpenChange,
+  customers,
+  shipments,
+  currency,
+  onCreate,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  customers: Customer[];
+  shipments: Shipment[];
+  currency: string;
+  onCreate: (data: Omit<Invoice, "id" | "orgId" | "number">) => void;
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<InvoiceForm>({
+    resolver: zodResolver(invoiceSchema),
+    defaultValues: {
+      customerId: "",
+      shipmentId: "",
+      subtotal: 0,
+      taxAmount: 0,
+      status: "draft",
+      issuedAt: todayISO(),
+      dueAt: todayISO(),
+    },
+  });
+
+  const [taxPct, setTaxPct] = React.useState("");
+
+  React.useEffect(() => {
+    if (open) {
+      reset({
+        customerId: customers[0]?.id ?? "",
+        shipmentId: "",
+        subtotal: 0,
+        taxAmount: 0,
+        status: "draft",
+        issuedAt: todayISO(),
+        dueAt: todayISO(),
+      });
+      setTaxPct("");
+    }
+  }, [open, reset, customers]);
+
+  const customerId = watch("customerId");
+  const shipmentId = watch("shipmentId");
+  const subtotal = Number(watch("subtotal")) || 0;
+  const taxAmount = Number(watch("taxAmount")) || 0;
+
+  const customerShipments = React.useMemo(
+    () => shipments.filter((s) => s.customerId === customerId),
+    [shipments, customerId],
+  );
+
+  // prefill subtotal when a shipment is selected
+  function handleShipmentChange(id: string) {
+    setValue("shipmentId", id);
+    if (id) {
+      const s = shipments.find((sh) => sh.id === id);
+      if (s) {
+        const cost = shipmentCost(s);
+        setValue("subtotal", cost.subtotal);
+        if (taxPct) {
+          const pct = Number(taxPct) || 0;
+          setValue("taxAmount", Math.round(cost.subtotal * (pct / 100) * 100) / 100);
+        }
+      }
+    }
+  }
+
+  function applyTaxPct(pctRaw: string) {
+    setTaxPct(pctRaw);
+    const pct = Number(pctRaw);
+    if (Number.isFinite(pct) && pctRaw !== "") {
+      setValue("taxAmount", Math.round(subtotal * (pct / 100) * 100) / 100);
+    }
+  }
+
+  const submit = handleSubmit((values) => {
+    const data: Omit<Invoice, "id" | "orgId" | "number"> = {
+      customerId: values.customerId,
+      shipmentId: values.shipmentId ? values.shipmentId : null,
+      subtotal: values.subtotal,
+      taxAmount: values.taxAmount,
+      total: values.subtotal + values.taxAmount,
+      status: values.status,
+      issuedAt: values.issuedAt,
+      dueAt: values.dueAt,
+    };
+    onCreate(data);
+    onOpenChange(false);
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>New invoice</DialogTitle>
+          <DialogDescription>
+            Create an invoice for one of your customers.
+          </DialogDescription>
+        </DialogHeader>
+
+        {customers.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No customers yet"
+            description="Add a customer before creating an invoice."
+          />
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
+            <Field
+              label="Customer"
+              htmlFor="i-customer"
+              required
+              error={errors.customerId?.message}
+            >
+              <NativeSelect id="i-customer" {...register("customerId")}>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.company ? ` — ${c.company}` : ""}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+
+            <Field label="Shipment (optional)" htmlFor="i-shipment">
+              <NativeSelect
+                id="i-shipment"
+                value={shipmentId}
+                onChange={(e) => handleShipmentChange(e.target.value)}
+              >
+                <option value="">None</option>
+                {customerShipments.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.reference} — {s.destinationCity}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field
+                label="Subtotal"
+                htmlFor="i-subtotal"
+                required
+                error={errors.subtotal?.message}
+              >
+                <Input
+                  id="i-subtotal"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  {...register("subtotal")}
+                />
+              </Field>
+              <Field label="Tax %" htmlFor="i-taxpct" hint="optional">
+                <Input
+                  id="i-taxpct"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={taxPct}
+                  onChange={(e) => applyTaxPct(e.target.value)}
+                  placeholder="e.g. 18"
+                />
+              </Field>
+              <Field
+                label="Tax amount"
+                htmlFor="i-tax"
+                error={errors.taxAmount?.message}
+              >
+                <Input
+                  id="i-tax"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  {...register("taxAmount")}
+                />
+              </Field>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Status" htmlFor="i-status">
+                <NativeSelect id="i-status" {...register("status")}>
+                  {INVOICE_STATUSES.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+              <Field
+                label="Issued"
+                htmlFor="i-issued"
+                error={errors.issuedAt?.message}
+              >
+                <Input id="i-issued" type="date" {...register("issuedAt")} />
+              </Field>
+              <Field
+                label="Due"
+                htmlFor="i-due"
+                error={errors.dueAt?.message}
+              >
+                <Input id="i-due" type="date" {...register("dueAt")} />
+              </Field>
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl bg-muted/40 p-3 shadow-clay-inset">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="text-lg font-bold">
+                {formatCurrency(subtotal + taxAmount, currency)}
+              </span>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Create invoice</Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

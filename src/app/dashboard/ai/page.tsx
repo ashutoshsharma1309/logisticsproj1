@@ -1,25 +1,21 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Sparkles,
-  Loader2,
   AlertTriangle,
   Route,
-  ShieldAlert,
   Warehouse,
   TrendingUp,
   DollarSign,
+  Leaf,
+  Truck,
   Fingerprint,
-  HeartPulse,
-  Lightbulb,
-  Zap,
-  Gauge,
   CheckCircle2,
-  X,
+  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,7 +25,6 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectTrigger,
@@ -37,329 +32,381 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/shared/page-header";
 import { FadeIn, StaggerGroup, StaggerItem } from "@/components/shared/motion";
 import { EmptyState } from "@/components/shared/empty-state";
-import { getStore } from "@/services/store";
-import { healthColor } from "@/config/status";
-import { formatCurrency, relativeTime, cn } from "@/lib/utils";
-import type { AiInsight } from "@/types";
-import type { BadgeProps } from "@/components/ui/badge";
+import { useOrgData } from "@/hooks/use-org-data";
+import { useCollection } from "@/hooks/use-collection";
+import { shipmentCost, shipmentEmissions } from "@/lib/domain/calc";
+import { warehouseUtilization } from "@/lib/analytics/compute";
+import { MODE_META } from "@/config/status";
+import { formatCurrency, formatCompact, formatNumber, cn } from "@/lib/utils";
+import type { TransportMode } from "@/types";
 
-type BadgeVariant = NonNullable<BadgeProps["variant"]>;
+type InsightCategory =
+  | "delay"
+  | "warehouse"
+  | "cost"
+  | "route"
+  | "emissions"
+  | "fleet";
 
-const TYPE_META: Record<
-  AiInsight["type"],
-  { label: string; icon: LucideIcon; tint: string; accent: string }
-> = {
-  delay: {
-    label: "Delay",
-    icon: AlertTriangle,
-    tint: "bg-warning/15 text-warning",
-    accent: "bg-warning",
-  },
-  route: {
-    label: "Route",
-    icon: Route,
-    tint: "bg-primary/15 text-primary",
-    accent: "bg-primary",
-  },
-  risk: {
-    label: "Risk",
-    icon: ShieldAlert,
-    tint: "bg-destructive/15 text-destructive",
-    accent: "bg-destructive",
-  },
-  warehouse: {
-    label: "Warehouse",
-    icon: Warehouse,
-    tint: "bg-secondary/15 text-secondary",
-    accent: "bg-secondary",
-  },
-  demand: {
-    label: "Demand",
-    icon: TrendingUp,
-    tint: "bg-accent/15 text-accent",
-    accent: "bg-accent",
-  },
-  cost: {
-    label: "Cost",
-    icon: DollarSign,
-    tint: "bg-success/15 text-success",
-    accent: "bg-success",
-  },
-  fraud: {
-    label: "Fraud",
-    icon: Fingerprint,
-    tint: "bg-destructive/15 text-destructive",
-    accent: "bg-destructive",
-  },
-  health: {
-    label: "Health",
-    icon: HeartPulse,
-    tint: "bg-accent/15 text-accent",
-    accent: "bg-accent",
-  },
-};
-
-const IMPACT_VARIANT: Record<AiInsight["impact"], BadgeVariant> = {
-  high: "destructive",
-  medium: "warning",
-  low: "muted",
-};
-
-const CAPABILITIES: {
-  name: string;
-  description: string;
+interface Insight {
+  id: string;
+  category: InsightCategory;
   icon: LucideIcon;
   tint: string;
-  accuracy: number;
-}[] = [
-  {
-    name: "Delay Prediction",
-    description: "Flags shipments likely to miss their ETA window.",
-    icon: AlertTriangle,
-    tint: "bg-warning/15 text-warning",
-    accuracy: 94,
-  },
-  {
-    name: "Route Suggestions",
-    description: "Recommends faster, lower-cost lane alternatives.",
-    icon: Route,
-    tint: "bg-primary/15 text-primary",
-    accuracy: 91,
-  },
-  {
-    name: "Risk Prediction",
-    description: "Scores exposure from weather, customs and carriers.",
-    icon: ShieldAlert,
-    tint: "bg-destructive/15 text-destructive",
-    accuracy: 89,
-  },
-  {
-    name: "Warehouse Optimization",
-    description: "Balances load and slotting across facilities.",
-    icon: Warehouse,
-    tint: "bg-secondary/15 text-secondary",
-    accuracy: 88,
-  },
-  {
-    name: "Demand Forecast",
-    description: "Projects volume by lane to pre-position capacity.",
-    icon: TrendingUp,
-    tint: "bg-accent/15 text-accent",
-    accuracy: 92,
-  },
-  {
-    name: "Cost Prediction",
-    description: "Estimates landed cost and surcharge drift.",
-    icon: DollarSign,
-    tint: "bg-success/15 text-success",
-    accuracy: 90,
-  },
-  {
-    name: "Shipment Health Score",
-    description: "Composite condition index for every in-flight load.",
-    icon: HeartPulse,
-    tint: "bg-accent/15 text-accent",
-    accuracy: 95,
-  },
-  {
-    name: "Fraud Detection",
-    description: "Detects ledger anomalies and tampering signals.",
-    icon: Fingerprint,
-    tint: "bg-destructive/15 text-destructive",
-    accuracy: 97,
-  },
+  title: string;
+  description: string;
+  href: string;
+  cta: string;
+  tone: "alert" | "info";
+}
+
+interface Capability {
+  name: string;
+  icon: LucideIcon;
+  tint: string;
+  metric: string;
+  caption: string;
+}
+
+const CATEGORY_FILTERS: { value: string; label: string }[] = [
+  { value: "all", label: "All categories" },
+  { value: "delay", label: "Delays" },
+  { value: "warehouse", label: "Warehouse" },
+  { value: "cost", label: "Cost" },
+  { value: "route", label: "Routes" },
+  { value: "emissions", label: "Emissions" },
+  { value: "fleet", label: "Fleet" },
 ];
 
-const TYPE_FILTERS: { value: string; label: string }[] = [
-  { value: "all", label: "All types" },
-  ...(
-    Object.keys(TYPE_META) as AiInsight["type"][]
-  ).map((t) => ({ value: t, label: TYPE_META[t].label })),
-];
+export default function AiIntelligencePage() {
+  const {
+    shipments,
+    warehouses,
+    vehicles,
+    currency,
+    isEmpty,
+  } = useOrgData();
+  const ledger = useCollection("ledger").items;
+  const [category, setCategory] = React.useState("all");
 
-export default function AiInsightsPage() {
-  const [insights, setInsights] = React.useState<AiInsight[]>(
-    () => getStore().insights,
-  );
-  const shipments = React.useMemo(() => getStore().shipments, []);
-  const [running, setRunning] = React.useState(false);
-  const [typeFilter, setTypeFilter] = React.useState("all");
-  const [impactFilter, setImpactFilter] = React.useState("all");
+  // ---- Derived, honest metrics (no fabricated confidence scores) -----------
+  const metrics = React.useMemo(() => {
+    const delayed = shipments.filter(
+      (s) => s.status === "delayed" || s.status === "exception",
+    );
+    const totalFreight = shipments.reduce(
+      (a, s) => a + shipmentCost(s).total,
+      0,
+    );
+    const totalDistance = shipments.reduce((a, s) => a + (s.distanceKm || 0), 0);
+    const totalEmissions = shipments.reduce(
+      (a, s) => a + shipmentEmissions(s),
+      0,
+    );
+    const util = warehouseUtilization(warehouses);
+    const overCapacity = util.filter((w) => w.pct > 90);
+    const activeVehicles = vehicles.filter((v) => v.status === "active").length;
+    const costPerKm = totalDistance > 0 ? totalFreight / totalDistance : 0;
+    const avgCostPerShipment =
+      shipments.length > 0 ? totalFreight / shipments.length : 0;
 
-  const stats = React.useMemo(() => {
-    const highImpact = insights.filter((i) => i.impact === "high").length;
-    const savings = insights.reduce((a, i) => a + (i.savingsUsd ?? 0), 0);
-    const avgConfidence = insights.length
-      ? Math.round(
-          insights.reduce((a, i) => a + i.confidence, 0) / insights.length,
-        )
-      : 0;
-    return { highImpact, savings, avgConfidence };
-  }, [insights]);
+    // Highest-cost lane: origin warehouse → destination city.
+    const laneMap = new Map<string, { label: string; total: number }>();
+    for (const s of shipments) {
+      const origin =
+        warehouses.find((w) => w.id === s.originWarehouseId)?.name ??
+        "Unknown origin";
+      const dest = s.destinationCity || "Unknown";
+      const key = `${origin}→${dest}`;
+      const cur = laneMap.get(key) ?? { label: `${origin} → ${dest}`, total: 0 };
+      cur.total += shipmentCost(s).total;
+      laneMap.set(key, cur);
+    }
+    const topLane = [...laneMap.values()].sort((a, b) => b.total - a.total)[0];
 
-  const statCards = [
-    {
-      label: "Total insights",
-      value: String(insights.length),
-      icon: Lightbulb,
-      tint: "bg-primary/12 text-primary",
-    },
-    {
-      label: "High-impact",
-      value: String(stats.highImpact),
-      icon: Zap,
-      tint: "bg-destructive/12 text-destructive",
-    },
-    {
-      label: "Projected savings",
-      value: formatCurrency(stats.savings),
-      icon: DollarSign,
-      tint: "bg-success/12 text-success",
-    },
-    {
-      label: "Avg confidence",
-      value: `${stats.avgConfidence}%`,
-      icon: Gauge,
-      tint: "bg-accent/12 text-accent",
-    },
-  ];
+    // Most-used mode.
+    const modeMap = new Map<TransportMode, number>();
+    for (const s of shipments)
+      modeMap.set(s.mode, (modeMap.get(s.mode) ?? 0) + 1);
+    const topMode = [...modeMap.entries()].sort((a, b) => b[1] - a[1])[0];
+
+    return {
+      delayed,
+      totalEmissions,
+      overCapacity,
+      util,
+      activeVehicles,
+      costPerKm,
+      avgCostPerShipment,
+      topLane,
+      topMode: topMode
+        ? { mode: topMode[0], count: topMode[1] }
+        : null,
+    };
+  }, [shipments, warehouses, vehicles]);
+
+  // ---- Capability tiles (each backed by a real number) ---------------------
+  const capabilities: Capability[] = React.useMemo(() => {
+    const dash = (v: string, ok: boolean) => (ok ? v : "—");
+    return [
+      {
+        name: "Delay Detection",
+        icon: AlertTriangle,
+        tint: "bg-warning/15 text-warning",
+        metric: dash(String(metrics.delayed.length), shipments.length > 0),
+        caption: "flagged shipments",
+      },
+      {
+        name: "Route Cost Analysis",
+        icon: Route,
+        tint: "bg-primary/15 text-primary",
+        metric: dash(
+          metrics.topLane ? formatCurrency(metrics.topLane.total, currency) : "—",
+          Boolean(metrics.topLane),
+        ),
+        caption: "top lane spend",
+      },
+      {
+        name: "Warehouse Optimization",
+        icon: Warehouse,
+        tint: "bg-secondary/15 text-secondary",
+        metric: dash(String(metrics.overCapacity.length), warehouses.length > 0),
+        caption: "facilities > 90%",
+      },
+      {
+        name: "Demand Signal",
+        icon: TrendingUp,
+        tint: "bg-accent/15 text-accent",
+        metric: dash(
+          metrics.topMode ? MODE_META[metrics.topMode.mode].label : "—",
+          Boolean(metrics.topMode),
+        ),
+        caption: "leading mode",
+      },
+      {
+        name: "Cost Efficiency",
+        icon: DollarSign,
+        tint: "bg-success/15 text-success",
+        metric: dash(
+          `${formatCurrency(metrics.costPerKm, currency)}`,
+          metrics.costPerKm > 0,
+        ),
+        caption: "avg cost / km",
+      },
+      {
+        name: "Emissions Tracking",
+        icon: Leaf,
+        tint: "bg-success/15 text-success",
+        metric: dash(
+          `${formatCompact(metrics.totalEmissions)} kg`,
+          shipments.length > 0,
+        ),
+        caption: "total CO₂",
+      },
+      {
+        name: "Fleet Readiness",
+        icon: Truck,
+        tint: "bg-primary/15 text-primary",
+        metric: dash(
+          `${metrics.activeVehicles}/${vehicles.length}`,
+          vehicles.length > 0,
+        ),
+        caption: "active vehicles",
+      },
+      {
+        name: "Data Integrity",
+        icon: Fingerprint,
+        tint: "bg-accent/15 text-accent",
+        metric: dash(String(ledger.length), ledger.length > 0),
+        caption: "ledger blocks",
+      },
+    ];
+  }, [metrics, shipments.length, warehouses.length, vehicles.length, ledger.length, currency]);
+
+  // ---- Insight feed (only from real conditions) ----------------------------
+  const insights: Insight[] = React.useMemo(() => {
+    const list: Insight[] = [];
+
+    if (metrics.delayed.length > 0) {
+      const refs = metrics.delayed
+        .slice(0, 4)
+        .map((s) => s.reference)
+        .join(", ");
+      list.push({
+        id: "delayed",
+        category: "delay",
+        icon: AlertTriangle,
+        tint: "bg-warning/15 text-warning",
+        title: `${metrics.delayed.length} shipment${
+          metrics.delayed.length === 1 ? "" : "s"
+        } delayed or in exception`,
+        description: `Needs attention: ${refs}${
+          metrics.delayed.length > 4 ? " and more" : ""
+        }.`,
+        href: "/dashboard/shipments",
+        cta: "Review shipments",
+        tone: "alert",
+      });
+    }
+
+    for (const w of metrics.overCapacity) {
+      list.push({
+        id: `wh-${w.name}`,
+        category: "warehouse",
+        icon: Warehouse,
+        tint: "bg-secondary/15 text-secondary",
+        title: `${w.name} at ${w.pct}% capacity`,
+        description:
+          "This facility is above 90% utilization — consider rebalancing inbound volume.",
+        href: "/dashboard/warehouses",
+        cta: "Open warehouses",
+        tone: "alert",
+      });
+    }
+
+    if (metrics.topLane) {
+      list.push({
+        id: "top-lane",
+        category: "route",
+        icon: Route,
+        tint: "bg-primary/15 text-primary",
+        title: `Highest-cost lane: ${metrics.topLane.label}`,
+        description: `This route accounts for ${formatCurrency(
+          metrics.topLane.total,
+          currency,
+        )} of total freight spend.`,
+        href: "/dashboard/shipments",
+        cta: "Inspect lane",
+        tone: "info",
+      });
+    }
+
+    if (metrics.topMode) {
+      list.push({
+        id: "top-mode",
+        category: "fleet",
+        icon: TrendingUp,
+        tint: "bg-accent/15 text-accent",
+        title: `Most-used mode: ${MODE_META[metrics.topMode.mode].label}`,
+        description: `${metrics.topMode.count} of ${formatNumber(
+          shipments.length,
+        )} shipments move by ${MODE_META[
+          metrics.topMode.mode
+        ].label.toLowerCase()}.`,
+        href: "/dashboard/analytics",
+        cta: "View analytics",
+        tone: "info",
+      });
+    }
+
+    if (metrics.avgCostPerShipment > 0) {
+      list.push({
+        id: "avg-cost",
+        category: "cost",
+        icon: DollarSign,
+        tint: "bg-success/15 text-success",
+        title: `Average delivery cost: ${formatCurrency(
+          metrics.avgCostPerShipment,
+          currency,
+        )} per shipment`,
+        description:
+          "Benchmark your quotes against this figure to protect margin on new lanes.",
+        href: "/dashboard/analytics",
+        cta: "See cost breakdown",
+        tone: "info",
+      });
+    }
+
+    if (metrics.totalEmissions > 0) {
+      list.push({
+        id: "emissions",
+        category: "emissions",
+        icon: Leaf,
+        tint: "bg-success/15 text-success",
+        title: `Estimated ${formatCompact(metrics.totalEmissions)} kg CO₂ across the network`,
+        description:
+          "Shifting eligible loads from air/road to rail or ocean is the fastest lever to cut this.",
+        href: "/dashboard/analytics",
+        cta: "Sustainability view",
+        tone: "info",
+      });
+    }
+
+    return list;
+  }, [metrics, shipments.length, currency]);
 
   const filtered = insights.filter(
-    (i) =>
-      (typeFilter === "all" || i.type === typeFilter) &&
-      (impactFilter === "all" || i.impact === impactFilter),
+    (i) => category === "all" || i.category === category,
   );
-
-  const healthRows = React.useMemo(
-    () =>
-      [...shipments]
-        .sort((a, b) => b.delayProbability - a.delayProbability)
-        .slice(0, 7),
-    [shipments],
-  );
-
-  function runAnalysis() {
-    if (running) return;
-    setRunning(true);
-    window.setTimeout(() => {
-      setRunning(false);
-      toast.success("Analysis complete", {
-        description: "The prediction engine refreshed all live insights.",
-      });
-    }, 1600);
-  }
-
-  function applyRecommendation(insight: AiInsight) {
-    toast.success("Recommendation applied", {
-      description: insight.title,
-    });
-  }
-
-  function dismiss(id: string) {
-    setInsights((prev) => prev.filter((i) => i.id !== id));
-    toast("Insight dismissed");
-  }
 
   return (
     <div className="space-y-6">
       <FadeIn>
         <PageHeader
           title="AI Intelligence"
-          description="A live prediction engine that fuses ledger, telemetry and market signals to surface the next best action across your network."
-        >
-          <Button variant="gradient" onClick={runAnalysis} disabled={running}>
-            {running ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            {running ? "Analyzing…" : "Run analysis"}
-          </Button>
-        </PageHeader>
+          description="Insights are computed from your live data by a transparent, rules-based engine — a heuristic layer that is pluggable for a real model as your dataset grows."
+        />
       </FadeIn>
 
-      {/* Stat row */}
-      <FadeIn delay={0.05}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {statCards.map((s) => {
-            const Icon = s.icon;
-            return (
-              <Card
-                key={s.label}
-                className="flex items-center gap-4 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-clay-lg"
-              >
-                <div
-                  className={cn(
-                    "grid h-12 w-12 shrink-0 place-items-center rounded-xl shadow-clay-inset",
-                    s.tint,
-                  )}
-                >
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-muted-foreground">
-                    {s.label}
-                  </p>
-                  <p className="mt-0.5 text-2xl font-bold tracking-tight">
-                    {s.value}
-                  </p>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </FadeIn>
-
-      {/* Capabilities grid */}
-      <FadeIn delay={0.1}>
-        <div>
-          <h2 className="mb-3 text-lg font-semibold tracking-tight">
-            Prediction Capabilities
-          </h2>
-          <StaggerGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {CAPABILITIES.map((c) => {
-              const Icon = c.icon;
-              return (
-                <StaggerItem key={c.name}>
-                  <Card className="h-full p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-clay-lg">
-                    <div
-                      className={cn(
-                        "grid h-11 w-11 place-items-center rounded-xl shadow-clay-inset",
-                        c.tint,
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <p className="mt-3 font-semibold">{c.name}</p>
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                      {c.description}
-                    </p>
-                    <div className="mt-3 flex items-center gap-2">
-                      <Progress value={c.accuracy} className="h-1.5" />
-                      <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
-                        {c.accuracy}%
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Model accuracy
-                    </p>
-                  </Card>
-                </StaggerItem>
-              );
-            })}
-          </StaggerGroup>
-        </div>
-      </FadeIn>
-
-      {/* Feed + health rail */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Insights feed */}
-        <div className="lg:col-span-2">
+      {isEmpty ? (
+        <FadeIn delay={0.05}>
+          <Card className="p-2">
+            <EmptyState
+              icon={Sparkles}
+              title="Insights appear as you add data"
+              description="This engine reads your real shipments, warehouses, fleet and ledger. Create records to surface delay, cost, routing and emissions insights."
+              action={
+                <Button variant="gradient" asChild>
+                  <Link href="/dashboard/shipments?new=1">
+                    Create your first shipment
+                  </Link>
+                </Button>
+              }
+            />
+          </Card>
+        </FadeIn>
+      ) : (
+        <>
+          {/* Capability tiles */}
           <FadeIn delay={0.05}>
+            <div>
+              <h2 className="mb-3 text-lg font-semibold tracking-tight">
+                Capabilities
+              </h2>
+              <StaggerGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {capabilities.map((c) => {
+                  const Icon = c.icon;
+                  return (
+                    <StaggerItem key={c.name}>
+                      <Card className="h-full p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-clay-lg">
+                        <div
+                          className={cn(
+                            "grid h-11 w-11 place-items-center rounded-xl shadow-clay-inset",
+                            c.tint,
+                          )}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <p className="mt-3 font-semibold">{c.name}</p>
+                        <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
+                          {c.metric}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {c.caption}
+                        </p>
+                      </Card>
+                    </StaggerItem>
+                  );
+                })}
+              </StaggerGroup>
+            </div>
+          </FadeIn>
+
+          {/* Insight feed */}
+          <FadeIn delay={0.1}>
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary/12 text-primary shadow-clay-inset">
@@ -370,74 +417,52 @@ export default function AiInsightsPage() {
                     Insight Feed
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    {filtered.length} active recommendation
-                    {filtered.length === 1 ? "" : "s"}
+                    {filtered.length} insight
+                    {filtered.length === 1 ? "" : "s"} derived from your data
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-[136px]" aria-label="Filter by type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TYPE_FILTERS.map((f) => (
-                      <SelectItem key={f.value} value={f.value}>
-                        {f.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={impactFilter} onValueChange={setImpactFilter}>
-                  <SelectTrigger className="w-[132px]" aria-label="Filter by impact">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All impact</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger
+                  className="w-[168px]"
+                  aria-label="Filter insights by category"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_FILTERS.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </FadeIn>
 
-          {filtered.length === 0 ? (
-            <Card className="p-2">
-              <EmptyState
-                icon={Sparkles}
-                title="No matching insights"
-                description="Adjust the filters or run a fresh analysis to generate new recommendations."
-                action={
-                  <Button variant="clay" onClick={runAnalysis}>
-                    <Sparkles className="h-4 w-4" />
-                    Run analysis
-                  </Button>
-                }
-              />
-            </Card>
-          ) : (
-            <StaggerGroup className="space-y-4">
-              {filtered.map((insight) => {
-                const meta = TYPE_META[insight.type];
-                const Icon = meta.icon;
-                return (
-                  <StaggerItem key={insight.id}>
-                    <Card className="relative overflow-hidden">
-                      <span
-                        className={cn(
-                          "absolute inset-y-0 left-0 w-1.5",
-                          meta.accent,
-                        )}
-                        aria-hidden
-                      />
-                      <CardContent className="p-5 pl-6">
+            {filtered.length === 0 ? (
+              <Card className="p-2">
+                <EmptyState
+                  icon={CheckCircle2}
+                  title="No issues detected across your current data"
+                  description={
+                    category === "all"
+                      ? "Everything looks healthy. New insights will appear automatically as conditions change."
+                      : "Nothing notable in this category right now. Try a different filter."
+                  }
+                />
+              </Card>
+            ) : (
+              <StaggerGroup className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {filtered.map((insight) => {
+                  const Icon = insight.icon;
+                  return (
+                    <StaggerItem key={insight.id}>
+                      <Card className="flex h-full flex-col p-5">
                         <div className="flex items-start gap-3">
                           <div
                             className={cn(
                               "grid h-11 w-11 shrink-0 place-items-center rounded-xl shadow-clay-inset",
-                              meta.tint,
+                              insight.tint,
                             )}
                           >
                             <Icon className="h-5 w-5" />
@@ -445,152 +470,40 @@ export default function AiInsightsPage() {
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <h3 className="font-semibold">{insight.title}</h3>
-                              <Badge
-                                variant={IMPACT_VARIANT[insight.impact]}
-                                className="capitalize"
-                              >
-                                {insight.impact} impact
-                              </Badge>
-                              <Badge variant="outline" className="capitalize">
-                                {meta.label}
-                              </Badge>
+                              {insight.tone === "alert" && (
+                                <Badge variant="warning">Action</Badge>
+                              )}
                             </div>
                             <p className="mt-1 text-sm text-muted-foreground">
                               {insight.description}
                             </p>
                           </div>
                         </div>
-
-                        <div className="mt-4 flex items-center gap-3">
-                          <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                            Confidence
-                          </span>
-                          <Progress value={insight.confidence} className="h-1.5" />
-                          <span className="shrink-0 text-xs font-semibold tabular-nums">
-                            {insight.confidence}%
-                          </span>
-                        </div>
-
-                        <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-primary/8 p-3.5 shadow-clay-inset">
-                          <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">
-                              Recommendation
-                            </p>
-                            <p className="mt-0.5 text-sm text-foreground">
-                              {insight.recommendation}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                          {typeof insight.savingsUsd === "number" && (
-                            <Badge variant="success">
-                              {formatCurrency(insight.savingsUsd)} saved
-                            </Badge>
-                          )}
-                          {insight.relatedShipment && (
-                            <Badge variant="muted">
-                              {insight.relatedShipment}
-                            </Badge>
-                          )}
-                          <span className="ml-auto text-muted-foreground">
-                            {relativeTime(insight.createdAt)}
-                          </span>
-                        </div>
-
-                        <Separator className="my-4" />
-
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="clay"
-                            onClick={() => applyRecommendation(insight)}
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                            Apply recommendation
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => dismiss(insight.id)}
-                          >
-                            <X className="h-4 w-4" />
-                            Dismiss
+                        <div className="mt-4 flex justify-end">
+                          <Button size="sm" variant="clay" asChild>
+                            <Link href={insight.href}>
+                              {insight.cta}
+                              <ArrowRight className="h-4 w-4" />
+                            </Link>
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </StaggerItem>
-                );
-              })}
-            </StaggerGroup>
-          )}
-        </div>
-
-        {/* Health rail */}
-        <div className="lg:col-span-1">
-          <FadeIn delay={0.1}>
-            <Card className="lg:sticky lg:top-6">
-              <CardHeader>
-                <div className="flex items-center gap-2.5">
-                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-accent/12 text-accent shadow-clay-inset">
-                    <HeartPulse className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <CardTitle>Shipment Health Scores</CardTitle>
-                    <CardDescription>Highest delay risk first</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {healthRows.map((s) => {
-                  const risk = Math.round(s.delayProbability * 100);
-                  return (
-                    <div
-                      key={s.id}
-                      className="rounded-2xl bg-muted/40 p-3.5 shadow-clay-inset"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate font-mono text-xs font-semibold">
-                          {s.reference}
-                        </span>
-                        <span
-                          className={cn(
-                            "text-sm font-bold tabular-nums",
-                            healthColor(s.healthScore),
-                          )}
-                        >
-                          {s.healthScore}
-                        </span>
-                      </div>
-                      <div className="mt-2.5 flex items-center gap-2">
-                        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Delay risk
-                        </span>
-                        <Progress
-                          value={risk}
-                          className="h-1.5"
-                          indicatorClassName={
-                            risk >= 60
-                              ? "bg-destructive"
-                              : risk >= 30
-                                ? "bg-warning"
-                                : "bg-success"
-                          }
-                        />
-                        <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted-foreground">
-                          {risk}%
-                        </span>
-                      </div>
-                    </div>
+                      </Card>
+                    </StaggerItem>
                   );
                 })}
-              </CardContent>
-            </Card>
+              </StaggerGroup>
+            )}
           </FadeIn>
-        </div>
-      </div>
+
+          <FadeIn delay={0.15}>
+            <p className="text-center text-xs text-muted-foreground">
+              These insights are heuristic (rules over your stored records), not
+              black-box predictions. The engine is architected so a trained model
+              can replace the rules without changing this page.
+            </p>
+          </FadeIn>
+        </>
+      )}
     </div>
   );
 }
