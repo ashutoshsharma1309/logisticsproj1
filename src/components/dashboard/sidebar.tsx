@@ -9,9 +9,14 @@ import { Logo } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
 import { DASHBOARD_NAV } from "@/config/nav";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/providers/auth-provider";
+import { useCollection } from "@/hooks/use-collection";
 
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { account } = useAuth();
+  const ledger = useCollection("ledger").items;
+  const role = account?.role;
 
   return (
     <div className="flex h-full flex-col gap-6 p-4">
@@ -25,7 +30,9 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
               {section.label}
             </p>
-            {section.items.map((item) => {
+            {section.items
+              .filter((item) => !item.roles || (role && item.roles.includes(role)))
+              .map((item) => {
               const active =
                 pathname === item.href ||
                 (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -75,7 +82,9 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           <span className="text-sm font-semibold">Blockchain Sim Mode</span>
         </div>
         <p className="mt-1.5 text-xs text-muted-foreground">
-          Decentralized ledger is running in simulation. All 60 nodes verified.
+          {ledger.length > 0
+            ? `Decentralized ledger running in simulation — ${ledger.length} block${ledger.length === 1 ? "" : "s"} verified.`
+            : "Ledger simulation ready. Blocks are minted as your shipments progress."}
         </p>
         <div className="mt-3 flex items-center gap-1.5">
           <span className="h-2 w-2 animate-pulse rounded-full bg-success" />

@@ -1,49 +1,130 @@
 "use client";
 
+import Link from "next/link";
 import {
-  AlertTriangle,
-  Route,
-  ShieldAlert,
   Warehouse,
-  TrendingUp,
-  DollarSign,
-  Fingerprint,
-  HeartPulse,
+  Truck,
+  Contact,
+  Package,
+  Gauge,
+  AlertTriangle,
+  Wrench,
+  CheckCircle2,
   Sparkles,
+  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getStore } from "@/services/store";
-import { formatCurrency, cn } from "@/lib/utils";
-import type { AiInsight } from "@/types";
-import type { BadgeProps } from "@/components/ui/badge";
+import { useOrgData } from "@/hooks/use-org-data";
+import { cn } from "@/lib/utils";
 
-const TYPE_META: Record<
-  AiInsight["type"],
-  { icon: LucideIcon; tint: string }
-> = {
-  delay: { icon: AlertTriangle, tint: "bg-warning/15 text-warning" },
-  route: { icon: Route, tint: "bg-primary/15 text-primary" },
-  risk: { icon: ShieldAlert, tint: "bg-destructive/15 text-destructive" },
-  warehouse: { icon: Warehouse, tint: "bg-secondary/15 text-secondary" },
-  demand: { icon: TrendingUp, tint: "bg-accent/15 text-accent" },
-  cost: { icon: DollarSign, tint: "bg-success/15 text-success" },
-  fraud: { icon: Fingerprint, tint: "bg-destructive/15 text-destructive" },
-  health: { icon: HeartPulse, tint: "bg-accent/15 text-accent" },
-};
-
-const IMPACT_VARIANT: Record<AiInsight["impact"], NonNullable<BadgeProps["variant"]>> = {
-  high: "destructive",
-  medium: "warning",
-  low: "muted",
-};
+interface Recommendation {
+  id: string;
+  icon: LucideIcon;
+  tint: string;
+  title: string;
+  body: string;
+  href: string;
+  cta: string;
+}
 
 export function InsightsPanel({ limit }: { limit?: number }) {
-  const { insights } = getStore();
-  const rows = typeof limit === "number" ? insights.slice(0, limit) : insights;
+  const { shipments, warehouses, vehicles, customers } = useOrgData();
+
+  const recs: Recommendation[] = [];
+
+  if (warehouses.length === 0) {
+    recs.push({
+      id: "add-warehouse",
+      icon: Warehouse,
+      tint: "bg-primary/15 text-primary",
+      title: "Add your first warehouse",
+      body: "Set up an origin location before you route shipments.",
+      href: "/dashboard/warehouses?new=1",
+      cta: "Add warehouse",
+    });
+  }
+  if (vehicles.length === 0) {
+    recs.push({
+      id: "add-vehicle",
+      icon: Truck,
+      tint: "bg-secondary/15 text-secondary",
+      title: "Register a vehicle",
+      body: "Build your fleet so shipments can be assigned transport.",
+      href: "/dashboard/fleet?new=1",
+      cta: "Register vehicle",
+    });
+  }
+  if (customers.length === 0) {
+    recs.push({
+      id: "add-customer",
+      icon: Contact,
+      tint: "bg-accent/15 text-accent",
+      title: "Add a customer",
+      body: "Create a customer account to attach shipments and invoices.",
+      href: "/dashboard/customers?new=1",
+      cta: "Add customer",
+    });
+  }
+  if (shipments.length === 0) {
+    recs.push({
+      id: "add-shipment",
+      icon: Package,
+      tint: "bg-primary/15 text-primary",
+      title: "Create your first shipment",
+      body: "Log a shipment to start tracking cost, routes and delivery.",
+      href: "/dashboard/shipments?new=1",
+      cta: "Create shipment",
+    });
+  }
+
+  const nearCapacity = warehouses.filter(
+    (w) => w.capacityUnits > 0 && w.usedUnits / w.capacityUnits > 0.9,
+  );
+  for (const w of nearCapacity) {
+    const pct = Math.round((w.usedUnits / w.capacityUnits) * 100);
+    recs.push({
+      id: `capacity-${w.id}`,
+      icon: Gauge,
+      tint: "bg-warning/15 text-warning",
+      title: `${w.name} is near capacity`,
+      body: `Utilization is at ${pct}%. Consider rebalancing stock.`,
+      href: "/dashboard/warehouses",
+      cta: "Review warehouse",
+    });
+  }
+
+  const needAttention = shipments.filter(
+    (s) => s.status === "delayed" || s.status === "exception",
+  ).length;
+  if (needAttention > 0) {
+    recs.push({
+      id: "attention",
+      icon: AlertTriangle,
+      tint: "bg-destructive/15 text-destructive",
+      title: `${needAttention} shipment${needAttention > 1 ? "s" : ""} need attention`,
+      body: "Delayed or exception shipments require follow-up.",
+      href: "/dashboard/shipments",
+      cta: "View shipments",
+    });
+  }
+
+  const inMaintenance = vehicles.filter((v) => v.status === "maintenance").length;
+  if (inMaintenance > 0) {
+    recs.push({
+      id: "maintenance",
+      icon: Wrench,
+      tint: "bg-warning/15 text-warning",
+      title: `${inMaintenance} vehicle${inMaintenance > 1 ? "s" : ""} in maintenance`,
+      body: "These vehicles are unavailable for new assignments.",
+      href: "/dashboard/fleet",
+      cta: "View fleet",
+    });
+  }
+
+  const rows = typeof limit === "number" ? recs.slice(0, limit) : recs;
 
   return (
     <Card className="flex h-full flex-col">
@@ -53,75 +134,66 @@ export function InsightsPanel({ limit }: { limit?: number }) {
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
-            <CardTitle>AI Suggestions</CardTitle>
+            <CardTitle>Recommendations</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Model-driven recommendations
+              Next steps from your live data
             </p>
           </div>
         </div>
-        <Badge variant="default">{rows.length}</Badge>
+        {rows.length > 0 && <Badge variant="default">{rows.length}</Badge>}
       </CardHeader>
       <CardContent className="flex-1 pb-4">
-        <ScrollArea className="h-[380px] pr-3">
-          <ul className="space-y-3">
-            {rows.map((insight) => {
-              const meta = TYPE_META[insight.type];
-              const Icon = meta.icon;
-              return (
-                <li
-                  key={insight.id}
-                  className="rounded-2xl bg-muted/40 p-3.5 shadow-clay-inset transition-colors hover:bg-muted/60"
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={cn(
-                        "mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl",
-                        meta.tint,
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="truncate text-sm font-semibold">
-                          {insight.title}
-                        </p>
-                        <Badge
-                          variant={IMPACT_VARIANT[insight.impact]}
-                          className="shrink-0 capitalize"
-                        >
-                          {insight.impact}
-                        </Badge>
-                      </div>
-                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                        {insight.description}
-                      </p>
-                      <div className="mt-2.5 flex items-center gap-3">
-                        <div className="flex min-w-0 flex-1 items-center gap-2">
-                          <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                            Confidence
-                          </span>
-                          <Progress
-                            value={insight.confidence}
-                            className="h-1.5"
-                          />
-                          <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted-foreground">
-                            {insight.confidence}%
-                          </span>
-                        </div>
-                        {typeof insight.savingsUsd === "number" && (
-                          <span className="shrink-0 text-xs font-semibold text-success">
-                            {formatCurrency(insight.savingsUsd)}
-                          </span>
+        {rows.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 py-10 text-center">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-success/15 text-success shadow-clay-inset">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-semibold">All clear</p>
+              <p className="mx-auto max-w-xs text-sm text-muted-foreground">
+                Your operations look healthy. No action needed right now.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ScrollArea className="h-[380px] pr-3">
+            <ul className="space-y-3">
+              {rows.map((rec) => {
+                const Icon = rec.icon;
+                return (
+                  <li
+                    key={rec.id}
+                    className="rounded-2xl bg-muted/40 p-3.5 shadow-clay-inset transition-colors hover:bg-muted/60"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={cn(
+                          "mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl",
+                          rec.tint,
                         )}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold">{rec.title}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {rec.body}
+                        </p>
+                        <Link
+                          href={rec.href}
+                          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary transition-colors hover:text-accent"
+                        >
+                          {rec.cta}
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
                       </div>
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </ScrollArea>
+                  </li>
+                );
+              })}
+            </ul>
+          </ScrollArea>
+        )}
       </CardContent>
     </Card>
   );
