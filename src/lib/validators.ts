@@ -15,6 +15,7 @@ export const roleValues = ["admin", "manager", "warehouse", "driver", "customer"
 export const signupSchema = z
   .object({
     name: z.string().min(2, "Enter your full name"),
+    company: z.string().min(2, "Enter your company name"),
     email: z.string().min(1, "Email is required").email("Enter a valid email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string().min(8, "Confirm your password"),

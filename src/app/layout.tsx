@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { AuthProvider } from "@/components/providers/auth-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "@/styles/globals.css";
 
@@ -73,8 +74,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster position="bottom-right" richColors closeButton />
+          <AuthProvider>
+            {children}
+            <Toaster position="bottom-right" richColors closeButton />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
