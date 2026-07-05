@@ -6,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeIn } from "@/components/shared/motion";
 import { MetricCard } from "@/components/shared/metric-card";
 import { AreaTrend } from "@/components/charts";
-import { getKpis, getDeliveryTrend } from "@/services/analytics";
+import { previewKpis, previewDeliveryTrend } from "@/lib/data/preview";
 
 export function DashboardPreview() {
-  const kpis = getKpis().slice(0, 3);
-  const trend = getDeliveryTrend();
+  const kpis = previewKpis;
+  const trend = previewDeliveryTrend;
 
   return (
     <section id="dashboard" className="py-20 sm:py-28">

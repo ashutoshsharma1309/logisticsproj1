@@ -54,12 +54,18 @@ export function MarketingFooter() {
               predictive AI, and enterprise-grade visibility.
             </p>
             <div className="flex gap-2">
-              {[Twitter, Linkedin, Github].map((Icon, i) => (
+              {[
+                { Icon: Twitter, label: "ChainRoute AI on X", href: "https://x.com/" },
+                { Icon: Linkedin, label: "ChainRoute AI on LinkedIn", href: "https://www.linkedin.com/" },
+                { Icon: Github, label: "ChainRoute AI on GitHub", href: "https://github.com/" },
+              ].map(({ Icon, label, href }) => (
                 <a
-                  key={i}
-                  href="#"
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="grid h-9 w-9 place-items-center rounded-xl bg-card text-muted-foreground shadow-clay-sm transition-all hover:-translate-y-0.5 hover:text-primary"
-                  aria-label="Social link"
+                  aria-label={label}
                 >
                   <Icon className="h-4 w-4" />
                 </a>

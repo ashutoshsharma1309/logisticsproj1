@@ -4,14 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FadeIn } from "@/components/shared/motion";
 import { WorldMap } from "@/components/map/world-map";
-import { getSimNodes, getSimRoutes } from "@/services/simulation";
-import { getStore } from "@/services/store";
+import { previewSimNodes, previewSimRoutes, previewBlockCount } from "@/lib/data/preview";
 import { formatNumber } from "@/lib/utils";
 
 export function SimulationPreview() {
-  const nodes = getSimNodes();
-  const routes = getSimRoutes(6);
-  const blocksMinted = getStore().ledger.length;
+  const nodes = previewSimNodes;
+  const routes = previewSimRoutes;
+  const blocksMinted = previewBlockCount;
 
   const stats = [
     { icon: MapPin, label: "Network nodes", value: formatNumber(nodes.length) },
