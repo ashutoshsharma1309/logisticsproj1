@@ -1,0 +1,201 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ------- Light theme (Claymorphism) ------- */
+    --background: 220 33% 96%;
+    --foreground: 224 40% 12%;
+
+    --card: 220 40% 99%;
+    --card-foreground: 224 40% 12%;
+
+    --popover: 220 40% 99%;
+    --popover-foreground: 224 40% 12%;
+
+    --primary: 250 84% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 172 66% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 20% 92%;
+    --muted-foreground: 224 15% 42%;
+
+    --accent: 280 70% 62%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 78% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 62% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 52%;
+    --warning-foreground: 30 60% 12%;
+
+    --border: 220 20% 88%;
+    --input: 220 20% 88%;
+    --ring: 250 84% 60%;
+
+    --clay-base: 220 33% 96%;
+    --clay-raised: 220 40% 99%;
+
+    --radius: 1.25rem;
+
+    /* Claymorphism shadows — soft, dual-tone, puffy */
+    --shadow-clay:
+      8px 8px 20px hsl(224 30% 70% / 0.35),
+      -8px -8px 20px hsl(0 0% 100% / 0.9);
+    --shadow-clay-sm:
+      4px 4px 10px hsl(224 30% 70% / 0.28),
+      -4px -4px 10px hsl(0 0% 100% / 0.85);
+    --shadow-clay-lg:
+      16px 16px 40px hsl(224 30% 65% / 0.4),
+      -12px -12px 32px hsl(0 0% 100% / 0.95);
+    --shadow-clay-inset:
+      inset 3px 3px 8px hsl(224 30% 70% / 0.3),
+      inset -3px -3px 8px hsl(0 0% 100% / 0.85);
+  }
+
+  .dark {
+    /* ------- Dark theme (Claymorphism) ------- */
+    --background: 226 32% 8%;
+    --foreground: 220 30% 96%;
+
+    --card: 226 28% 12%;
+    --card-foreground: 220 30% 96%;
+
+    --popover: 226 28% 12%;
+    --popover-foreground: 220 30% 96%;
+
+    --primary: 250 90% 68%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 172 70% 48%;
+    --secondary-foreground: 226 32% 8%;
+
+    --muted: 226 24% 16%;
+    --muted-foreground: 220 16% 62%;
+
+    --accent: 280 78% 68%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 74% 62%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 60% 48%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 58%;
+    --warning-foreground: 30 60% 10%;
+
+    --border: 226 22% 20%;
+    --input: 226 22% 22%;
+    --ring: 250 90% 68%;
+
+    --clay-base: 226 32% 8%;
+    --clay-raised: 226 28% 13%;
+
+    --shadow-clay:
+      8px 8px 20px hsl(226 40% 3% / 0.6),
+      -6px -6px 18px hsl(226 24% 20% / 0.5);
+    --shadow-clay-sm:
+      4px 4px 10px hsl(226 40% 3% / 0.55),
+      -3px -3px 9px hsl(226 24% 20% / 0.45);
+    --shadow-clay-lg:
+      18px 18px 44px hsl(226 40% 2% / 0.7),
+      -10px -10px 30px hsl(226 24% 22% / 0.5);
+    --shadow-clay-inset:
+      inset 3px 3px 8px hsl(226 40% 3% / 0.6),
+      inset -3px -3px 8px hsl(226 24% 20% / 0.4);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    @apply bg-primary/25;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-muted-foreground/25;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+@layer components {
+  /* Puffy raised clay surface */
+  .clay {
+    @apply rounded-2xl bg-card shadow-clay;
+  }
+  .clay-sm {
+    @apply rounded-xl bg-card shadow-clay-sm;
+  }
+  .clay-lg {
+    @apply rounded-3xl bg-card shadow-clay-lg;
+  }
+  .clay-inset {
+    @apply rounded-2xl bg-muted/50 shadow-clay-inset;
+  }
+
+  .glass {
+    @apply border border-white/10 bg-white/5 backdrop-blur-xl;
+  }
+
+  .clay-interactive {
+    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-clay-lg active:translate-y-0 active:shadow-clay-sm;
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-br from-primary via-accent to-secondary bg-clip-text text-transparent;
+  }
+
+  .bg-mesh {
+    background-image:
+      radial-gradient(at 20% 20%, hsl(var(--primary) / 0.14) 0px, transparent 50%),
+      radial-gradient(at 80% 10%, hsl(var(--accent) / 0.12) 0px, transparent 50%),
+      radial-gradient(at 70% 80%, hsl(var(--secondary) / 0.12) 0px, transparent 50%),
+      radial-gradient(at 10% 90%, hsl(var(--primary) / 0.1) 0px, transparent 50%);
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+}
