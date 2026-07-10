@@ -4,112 +4,107 @@
 
 @layer base {
   :root {
-    /* ------- Light theme (Claymorphism) ------- */
-    --background: 220 33% 96%;
-    --foreground: 224 40% 12%;
+    /* ------- Light theme — engineered, restrained ------- */
+    --background: 220 22% 97%;
+    --foreground: 224 40% 11%;
 
-    --card: 220 40% 99%;
-    --card-foreground: 224 40% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 40% 11%;
 
-    --popover: 220 40% 99%;
-    --popover-foreground: 224 40% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 40% 11%;
 
-    --primary: 250 84% 60%;
+    /* Indigo brand — confident, fintech-grade, not the generic AI violet */
+    --primary: 243 72% 56%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 172 66% 45%;
+    /* Teal — the single functional accent (verified / ledger / success adjacency) */
+    --secondary: 172 60% 38%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 20% 92%;
-    --muted-foreground: 224 15% 42%;
+    --muted: 220 16% 94%;
+    --muted-foreground: 220 10% 42%;
 
-    --accent: 280 70% 62%;
+    --accent: 255 66% 60%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 78% 60%;
+    --destructive: 0 72% 54%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 62% 42%;
+    --success: 152 55% 38%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 52%;
-    --warning-foreground: 30 60% 12%;
+    --warning: 33 92% 48%;
+    --warning-foreground: 30 60% 10%;
 
-    --border: 220 20% 88%;
-    --input: 220 20% 88%;
-    --ring: 250 84% 60%;
+    --border: 220 16% 89%;
+    --input: 220 16% 87%;
+    --ring: 243 72% 56%;
 
-    --clay-base: 220 33% 96%;
-    --clay-raised: 220 40% 99%;
+    --clay-base: 220 22% 97%;
+    --clay-raised: 0 0% 100%;
 
-    --radius: 1.25rem;
+    --radius: 0.625rem;
 
-    /* Claymorphism shadows — soft, dual-tone, puffy */
+    /* Elevation — crisp, single-source, low-opacity (Linear/Vercel school) */
+    --shadow-clay-sm: 0 1px 2px hsl(224 40% 20% / 0.06), 0 1px 1px hsl(224 40% 20% / 0.04);
     --shadow-clay:
-      8px 8px 20px hsl(224 30% 70% / 0.35),
-      -8px -8px 20px hsl(0 0% 100% / 0.9);
-    --shadow-clay-sm:
-      4px 4px 10px hsl(224 30% 70% / 0.28),
-      -4px -4px 10px hsl(0 0% 100% / 0.85);
+      0 1px 2px hsl(224 40% 20% / 0.06),
+      0 4px 12px -3px hsl(224 40% 20% / 0.08);
     --shadow-clay-lg:
-      16px 16px 40px hsl(224 30% 65% / 0.4),
-      -12px -12px 32px hsl(0 0% 100% / 0.95);
-    --shadow-clay-inset:
-      inset 3px 3px 8px hsl(224 30% 70% / 0.3),
-      inset -3px -3px 8px hsl(0 0% 100% / 0.85);
+      0 2px 4px hsl(224 40% 20% / 0.05),
+      0 12px 32px -8px hsl(224 40% 20% / 0.14);
+    --shadow-clay-inset: inset 0 1px 2px hsl(224 30% 20% / 0.06);
   }
 
   .dark {
-    /* ------- Dark theme (Claymorphism) ------- */
-    --background: 226 32% 8%;
-    --foreground: 220 30% 96%;
+    /* ------- Dark theme — deep, near-black, cool ------- */
+    --background: 224 34% 6%;
+    --foreground: 220 22% 96%;
 
-    --card: 226 28% 12%;
-    --card-foreground: 220 30% 96%;
+    --card: 224 28% 9%;
+    --card-foreground: 220 22% 96%;
 
-    --popover: 226 28% 12%;
-    --popover-foreground: 220 30% 96%;
+    --popover: 224 28% 10%;
+    --popover-foreground: 220 22% 96%;
 
-    --primary: 250 90% 68%;
+    --primary: 244 84% 68%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 172 70% 48%;
-    --secondary-foreground: 226 32% 8%;
+    --secondary: 172 62% 44%;
+    --secondary-foreground: 224 34% 6%;
 
-    --muted: 226 24% 16%;
-    --muted-foreground: 220 16% 62%;
+    --muted: 224 20% 14%;
+    --muted-foreground: 220 12% 60%;
 
-    --accent: 280 78% 68%;
+    --accent: 256 74% 70%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 74% 62%;
+    --destructive: 0 70% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 60% 48%;
+    --success: 152 55% 46%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 58%;
-    --warning-foreground: 30 60% 10%;
+    --warning: 35 92% 56%;
+    --warning-foreground: 30 60% 8%;
 
-    --border: 226 22% 20%;
-    --input: 226 22% 22%;
-    --ring: 250 90% 68%;
+    --border: 224 18% 16%;
+    --input: 224 18% 18%;
+    --ring: 244 84% 68%;
 
-    --clay-base: 226 32% 8%;
-    --clay-raised: 226 28% 13%;
+    --clay-base: 224 34% 6%;
+    --clay-raised: 224 28% 9%;
 
+    /* In dark, the hairline border carries elevation; shadows stay minimal. */
+    --shadow-clay-sm: 0 1px 2px hsl(224 60% 2% / 0.4);
     --shadow-clay:
-      8px 8px 20px hsl(226 40% 3% / 0.6),
-      -6px -6px 18px hsl(226 24% 20% / 0.5);
-    --shadow-clay-sm:
-      4px 4px 10px hsl(226 40% 3% / 0.55),
-      -3px -3px 9px hsl(226 24% 20% / 0.45);
+      0 1px 2px hsl(224 60% 2% / 0.4),
+      0 6px 16px -6px hsl(224 60% 2% / 0.5);
     --shadow-clay-lg:
-      18px 18px 44px hsl(226 40% 2% / 0.7),
-      -10px -10px 30px hsl(226 24% 22% / 0.5);
-    --shadow-clay-inset:
-      inset 3px 3px 8px hsl(226 40% 3% / 0.6),
-      inset -3px -3px 8px hsl(226 24% 20% / 0.4);
+      0 2px 4px hsl(224 60% 2% / 0.4),
+      0 16px 40px -12px hsl(224 60% 2% / 0.6);
+    --shadow-clay-inset: inset 0 1px 2px hsl(224 60% 2% / 0.4);
   }
 
   * {
@@ -122,15 +117,19 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1, "cv01" 1;
     text-rendering: optimizeLegibility;
   }
 
-  ::selection {
-    @apply bg-primary/25;
+  /* Tighter optical tracking on display headings — a handcrafted, engineered feel */
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
   }
 
-  /* Custom scrollbar */
+  ::selection {
+    @apply bg-primary/20;
+  }
+
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -139,48 +138,49 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-muted-foreground/25;
+    @apply rounded-full bg-muted-foreground/20;
     border: 2px solid transparent;
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/40;
+    @apply bg-muted-foreground/35;
   }
 }
 
 @layer components {
-  /* Puffy raised clay surface */
+  /* A surface = hairline border + subtle elevation. No puff, no dual-tone. */
   .clay {
-    @apply rounded-2xl bg-card shadow-clay;
+    @apply rounded-2xl border border-border bg-card shadow-clay-sm;
   }
   .clay-sm {
-    @apply rounded-xl bg-card shadow-clay-sm;
+    @apply rounded-xl border border-border bg-card shadow-clay-sm;
   }
   .clay-lg {
-    @apply rounded-3xl bg-card shadow-clay-lg;
+    @apply rounded-2xl border border-border bg-card shadow-clay;
   }
+  /* Recessed control surface (inputs, wells) */
   .clay-inset {
-    @apply rounded-2xl bg-muted/50 shadow-clay-inset;
+    @apply rounded-xl border border-border bg-muted/40 shadow-clay-inset;
   }
 
   .glass {
-    @apply border border-white/10 bg-white/5 backdrop-blur-xl;
+    @apply border border-white/10 bg-background/60 backdrop-blur-xl;
   }
 
+  /* Restrained interactive lift */
   .clay-interactive {
-    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-clay-lg active:translate-y-0 active:shadow-clay-sm;
+    @apply transition-all duration-200 ease-out hover:-translate-y-px hover:border-border/80 hover:shadow-clay active:translate-y-0;
   }
 
+  /* Single subtle two-stop brand gradient — used sparingly on one accent word */
   .text-gradient {
-    @apply bg-gradient-to-br from-primary via-accent to-secondary bg-clip-text text-transparent;
+    @apply bg-gradient-to-br from-primary to-accent bg-clip-text text-transparent;
   }
 
+  /* Calm ambient wash — a single low-opacity radial, not a rainbow mesh */
   .bg-mesh {
     background-image:
-      radial-gradient(at 20% 20%, hsl(var(--primary) / 0.14) 0px, transparent 50%),
-      radial-gradient(at 80% 10%, hsl(var(--accent) / 0.12) 0px, transparent 50%),
-      radial-gradient(at 70% 80%, hsl(var(--secondary) / 0.12) 0px, transparent 50%),
-      radial-gradient(at 10% 90%, hsl(var(--primary) / 0.1) 0px, transparent 50%);
+      radial-gradient(60% 55% at 50% -8%, hsl(var(--primary) / 0.10) 0%, transparent 60%);
   }
 }
 
@@ -197,5 +197,10 @@
   }
   .animation-delay-4000 {
     animation-delay: 4s;
+  }
+  /* Fine engineering grid — a subtle, intentional texture (opt-in) */
+  .bg-dot-grid {
+    background-image: radial-gradient(hsl(var(--border)) 1px, transparent 1px);
+    background-size: 22px 22px;
   }
 }

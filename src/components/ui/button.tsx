@@ -11,24 +11,24 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-clay-sm hover:-translate-y-0.5 hover:shadow-clay hover:brightness-105",
+          "bg-primary text-primary-foreground shadow-clay-sm hover:bg-primary/90",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-clay-sm hover:-translate-y-0.5 hover:shadow-clay",
+          "bg-secondary text-secondary-foreground shadow-clay-sm hover:bg-secondary/90",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-clay-sm hover:-translate-y-0.5 hover:shadow-clay",
+          "bg-destructive text-destructive-foreground shadow-clay-sm hover:bg-destructive/90",
         outline:
-          "border border-border bg-card/60 shadow-clay-sm hover:bg-muted hover:-translate-y-0.5",
+          "border border-border bg-card shadow-clay-sm hover:bg-muted hover:border-border/70",
         ghost: "hover:bg-muted hover:text-foreground",
-        clay: "bg-card text-foreground shadow-clay hover:-translate-y-0.5 hover:shadow-clay-lg active:shadow-clay-sm",
+        clay: "border border-border bg-card text-foreground shadow-clay-sm hover:bg-muted",
         link: "text-primary underline-offset-4 hover:underline",
         gradient:
-          "bg-gradient-to-br from-primary via-accent to-secondary text-white shadow-clay-sm hover:-translate-y-0.5 hover:shadow-glow",
+          "bg-gradient-to-b from-primary to-accent text-white shadow-clay-sm hover:brightness-[1.07]",
       },
       size: {
-        default: "h-11 px-5 py-2",
-        sm: "h-9 rounded-lg px-3.5 text-xs",
-        lg: "h-13 rounded-2xl px-8 text-base",
-        icon: "h-11 w-11",
+        default: "h-10 px-4",
+        sm: "h-8 rounded-md px-3 text-xs",
+        lg: "h-11 rounded-xl px-6 text-[15px]",
+        icon: "h-10 w-10",
         "icon-sm": "h-9 w-9 rounded-lg",
       },
     },

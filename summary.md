@@ -35,7 +35,9 @@
 - **Package name:** `chainroute-ai` (v1.0.0, private)
 - **Purpose:** An AI-flavored logistics SaaS where a company manages its warehouses, fleet, drivers, customers, shipments, and invoices, and gets **dynamically computed** analytics plus an **immutable, hash-chained shipment ledger** ("Blockchain Simulation Mode" — a decentralized *simulation*, explicitly **not** a real blockchain).
 - **Problem it solves:** Traditional logistics tooling has poor transparency, mutable shipment history, weak delay/risk insight, and clunky UX. ChainRoute AI provides tamper-evident shipment events (hash-chained ledger), transparent rules-based insights, live analytics derived only from real records, and a premium, accessible UI.
-- **High-level overview:** A **Next.js 15 (App Router) + React 19 + TypeScript** application that is **100% client-side** — there is **no backend, no database server, no API routes, and no environment variables**. All business data is user-entered and persisted per-organization in the browser's `localStorage` behind a **swappable repository abstraction**, so the app deploys to Vercel/Netlify/any Node host with zero configuration. The design system is **Claymorphism** (soft, puffy, dual-tone shadows) with full light/dark theming.
+- **High-level overview:** A **Next.js 15 (App Router) + React 19 + TypeScript** application that is **100% client-side** — there is **no backend, no database server, no API routes, and no environment variables**. All business data is user-entered and persisted per-organization in the browser's `localStorage` behind a **swappable repository abstraction**, so the app deploys to Vercel/Netlify/any Node host with zero configuration. The design language is **"engineered surface"** — hairline borders + restrained single-source elevation, tight radii, a disciplined indigo/teal palette, and gradient used only as a rare accent (Linear/Vercel/Stripe school), with full light/dark theming.
+
+> **Design-token note for maintainers:** the utility/semantic class names are still `clay`, `shadow-clay*`, `clay-inset`, etc. (kept for continuity), but they no longer render puffy dual-tone "claymorphism" — they now render crisp bordered surfaces with subtle elevation. Don't reintroduce puffy shadows, mesh gradients, or oversized radii. See `src/styles/globals.css` + `tailwind.config.ts`.
 
 **Critical mental model:** The app starts **empty**. Nothing is fabricated. Users create records; analytics, the ledger, KPIs, and insights are all **derived** from those records. There is an **opt-in** "Load demo data" button for hosted previews.
 
@@ -488,7 +490,7 @@ flowchart LR
 - **Logging:** no console logging in normal paths; user-facing "logging" is the **audit trail** (`logAudit`) + notifications.
 - **Dependency injection:** implicit via the repository seam (`lib/db/client.ts`) and hooks; feature code depends on abstractions, not `localStorage`.
 - **Validation:** `zod` schemas (`lib/validators.ts`) for auth; entity dialogs use RHF + zod resolvers or controlled state with manual guards; numbers are coerced (never persist `NaN`).
-- **Styling:** Claymorphism utility classes (`clay`, `clay-sm/lg/inset`, `text-gradient`, `bg-mesh`, `glass`) + tokens; `cn()` for class merging; CVA for button/badge variants.
+- **Styling:** semantic surface classes (`clay`, `clay-sm/lg/inset`, `text-gradient`, `bg-mesh`, `bg-dot-grid`, `glass`) mapped to CSS-variable tokens; `cn()` for class merging; CVA for button/badge variants. Surfaces = hairline border + subtle elevation (not puffy).
 - **Money/format:** always `formatCurrency(value, org.currency)`.
 
 ---
@@ -519,10 +521,11 @@ npm run start     # serve production build on $PORT (default 3000)
 
 ## Testing
 
-- **Test framework:** **none present.** There are no unit/integration/e2e test files, no Jest/Vitest/Playwright config, and no `test` script.
-- **Existing tests / coverage:** none.
-- **How verification was done (from `docs/`):** `tsc --noEmit` (0 errors), `next build` (0 warnings, all routes prerendered), and a manual browser QA sweep (documented in `docs/TRANSFORMATION_REPORT.md`).
-- **Recommendation:** add Vitest + React Testing Library for `lib/*` pure functions (costing, emissions, `verifyChain`, analytics) and Playwright for the signup→CRUD→ledger flow.
+- **Test framework:** **Vitest** (node environment, `@` alias), configured in `vitest.config.ts`. Scripts: `npm run test`, `test:watch`, `test:coverage`.
+- **Existing tests:** **52 unit tests** across `src/lib/**/*.test.ts` covering the business-critical pure logic — `verifyChain` tamper-detection (ledger integrity), `simHash`/`seededRandom` determinism, shipment costing + CO₂ math, empty-safe analytics aggregation, and formatters. Component/DOM tests are intentionally omitted (brittle with React 19 + jsdom; UI is covered by manual browser QA).
+- **CI:** `.github/workflows/ci.yml` runs typecheck → lint → test → build on every push/PR to `main`.
+- **Other verification:** `tsc --noEmit` (0 errors), `next build` (0 warnings, all routes prerendered), and a documented browser QA sweep (`docs/TRANSFORMATION_REPORT.md`).
+- **Recommendation:** add Playwright for the signup→CRUD→ledger end-to-end flow.
 
 ---
 
@@ -531,12 +534,9 @@ npm run start     # serve production build on $PORT (default 3000)
 - **Persistence is per-browser `localStorage`** — no cross-device/multi-user sync; clearing browser storage wipes the workspace.
 - **Auth is client-side and passwords use a non-crypto hash** — not production-secure; anyone can create local accounts.
 - **No backend/API/database, no rate limiting, no email delivery** (reset codes shown on screen; invoices/contact don't send).
-- **Orphaned route:** `/verify-otp` is unreachable via UI (dead code).
-- **Unused dependency:** `@tanstack/react-table`.
-- **No automated tests.**
 - **No per-permission authorization** beyond role-based nav filtering + Admin self-guards.
 - **AI is rules-based**, not a real model (by design; clearly labeled).
-- **Stray `.DS_Store` files** are tracked under `src/` (should be gitignored/removed).
+- **Test coverage is unit-only** (pure `lib/*` logic); no end-to-end (Playwright) tests yet.
 - **No `TODO`/`FIXME` markers or known runtime bugs found in source** at the time of writing (inferred from a grep-level review).
 
 ---
@@ -573,7 +573,7 @@ npm run start     # serve production build on $PORT (default 3000)
 - Auth behavior → `components/providers/auth-provider.tsx` + `lib/auth/accounts.ts`.
 - Persistence engine change → **only** `src/lib/db/client.ts`.
 
-**Coding conventions:** strict TS, **no `any`**, no fabricated data (always empty-state until user data exists), client pages have no `metadata`, deterministic rendering (avoid `Date.now()`/`Math.random()` in render output — use the seeded helpers), Claymorphism tokens only (no hardcoded hex), accessible controls (labels/aria).
+**Coding conventions:** strict TS, **no `any`**, no fabricated data (always empty-state until user data exists), client pages have no `metadata`, deterministic rendering (avoid `Date.now()`/`Math.random()` in render output — use the seeded helpers), design-token colors only (no hardcoded hex), keep the engineered-surface aesthetic (hairline borders + subtle elevation — no puffy shadows, no rainbow gradients, no oversized radii), accessible controls (labels/aria).
 
 **Do NOT change lightly:**
 - `lib/db/client.ts` reactivity contract (stable snapshot references + `emit()`), or `useSyncExternalStore` breaks.
@@ -599,7 +599,7 @@ npm run start     # serve production build on $PORT (default 3000)
 - **Stat** — a computed KPI `{ id, label, value, display, hint, icon, empty }`; `empty` renders as "—".
 - **Onboarded** — org flag gating dashboard access; `false` forces the `/onboarding` wizard.
 - **Demo data** — an **opt-in** realistic sample dataset (`lib/db/seed.ts`) for hosted previews; never loaded automatically.
-- **Claymorphism** — the design language: soft, puffy, rounded surfaces with dual-tone shadows (tokens in `globals.css`).
+- **Engineered surface** — the design language: hairline-bordered cards with restrained single-source elevation, tight radii, and a disciplined indigo/teal palette (tokens in `globals.css`). The legacy `clay*` class names remain but no longer render puffy claymorphism.
 - **simHash / mulberry32** — the non-crypto deterministic hash and seeded PRNG underpinning the ledger and demo data.
 
 ---

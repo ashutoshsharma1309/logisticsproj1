@@ -15,31 +15,20 @@ const HERO_STATS = [
 export function Hero() {
   return (
     <section className="relative overflow-hidden pt-36 pb-24">
-      {/* animated background */}
+      {/* Calm, engineered backdrop — one soft brand wash + a fine masked grid */}
       <div className="pointer-events-none absolute inset-0 -z-10 bg-mesh" />
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-grid-pattern [background-size:44px_44px] opacity-[0.35] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute -top-24 left-1/4 -z-10 h-72 w-72 rounded-full bg-primary/25 blur-3xl"
-        animate={{ y: [0, 30, 0], opacity: [0.5, 0.8, 0.5] }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute top-20 right-1/4 -z-10 h-72 w-72 rounded-full bg-secondary/25 blur-3xl"
-        animate={{ y: [0, -30, 0], opacity: [0.4, 0.7, 0.4] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-      />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-dot-grid opacity-70 [mask-image:radial-gradient(ellipse_62%_50%_at_50%_0%,black,transparent_78%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
       <div className="mx-auto max-w-4xl px-6 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full bg-card px-4 py-1.5 text-sm shadow-clay-sm"
+          className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-[13px] shadow-clay-sm"
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/15">
-            <Sparkles className="h-3 w-3 text-primary" />
+          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/15">
+            <Sparkles className="h-2.5 w-2.5 text-primary" />
           </span>
           <span className="font-medium">Blockchain Simulation Mode</span>
           <span className="text-muted-foreground">· decentralized by design</span>

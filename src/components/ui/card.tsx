@@ -9,7 +9,7 @@ const Card = React.forwardRef<
     ref={ref}
     className={cn(
       "rounded-2xl text-card-foreground",
-      variant === "clay" && "bg-card shadow-clay",
+      variant === "clay" && "border border-border bg-card shadow-clay-sm",
       variant === "flat" && "border border-border bg-card",
       variant === "glass" && "glass",
       className,

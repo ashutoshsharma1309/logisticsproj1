@@ -65,11 +65,12 @@ const config: Config = {
         },
       },
       borderRadius: {
+        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 2px)",
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 4px)",
-        sm: "calc(var(--radius) - 8px)",
-        "2xl": "calc(var(--radius) + 8px)",
-        "3xl": "calc(var(--radius) + 16px)",
+        xl: "0.75rem",
+        "2xl": "0.875rem",
+        "3xl": "1.125rem",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
@@ -80,7 +81,7 @@ const config: Config = {
         "clay-sm": "var(--shadow-clay-sm)",
         "clay-lg": "var(--shadow-clay-lg)",
         "clay-inset": "var(--shadow-clay-inset)",
-        glow: "0 0 40px -8px hsl(var(--primary) / 0.5)",
+        glow: "0 0 0 1px hsl(var(--primary) / 0.14), 0 12px 40px -14px hsl(var(--primary) / 0.4)",
       },
       keyframes: {
         "accordion-down": {
