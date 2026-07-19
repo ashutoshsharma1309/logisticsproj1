@@ -58,7 +58,8 @@
 - Role selection (5 roles) and role-based nav filtering.
 
 **Dashboard modules** (`src/app/dashboard/*`) — all data-driven with empty states:
-- **Home** (`/dashboard`): quick-start empty state, live KPI grid (`StatCard`), delivery/mode/revenue/cost charts, live shipments, computed recommendations, audit activity feed, opt-in demo-data loader.
+- **Home → AI Command Center** (`/dashboard`): "Mission Control" — a composite **org Health Score** (`lib/health/score.ts`, weighted + empty-safe), a **live Alerts** rail (`lib/alerts/derive.ts`, real computed conditions), a **Network Map** panel, a **Ledger Activity** timeline, live KPI grid, charts, recommendations, and the first-run quick-start empty state. Wired by `useCommandCenter`.
+- **Digital Twin** (`/dashboard/twin`): a real interactive geospatial map (**MapLibre GL** + theme-matched CARTO/OpenStreetMap basemaps, no API key) mirroring the network — warehouse hubs, destination cities, animated multimodal shipment markers, derived risk zones, layer toggles, play/pause/speed, browser geolocation, click-to-inspect. Coordinates derived deterministically (`buildGeoModel`/`geoForName` in `lib/network.ts`); the map lazy-loads via `next/dynamic` (not in the main bundle).
 - **Shipments**: full CRUD + cost breakdown (freight/fuel/packaging/insurance/other + GST), live total, status "advance", per-shipment ledger timeline, **mints a ledger block on create and on status change**.
 - **Warehouses**: CRUD, capacity/utilization, service areas, utilization bar chart.
 - **Fleet**: vehicles + drivers CRUD with **two-way driver↔vehicle linkage**, fuel/maintenance, utilization donut.

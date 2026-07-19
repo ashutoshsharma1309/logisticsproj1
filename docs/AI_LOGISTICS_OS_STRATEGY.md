@@ -1,6 +1,8 @@
 # ChainRoute AI → AI Logistics Operating System
 ## Strategy, Audit & Implementation Plan
 
+> **Build progress:** ✅ **Sprint 0.5** (dead-code removal + shared `lib/network.ts` dedupe) · ✅ **Sprint 1 — AI Command Center** (composite Health Score, live Alerts, Network Map, Ledger Activity timeline; 8 new tests) · ✅ **Sprint 2 — Digital Twin** (MapLibre + CARTO/OSM, animated shipments, risk zones, geolocation; no secrets). Next up: Sprint 3 (Risk + Optimizer). Sprint 5 (Copilot) remains gated on an LLM key.
+
 > **Status:** Planning deliverable. **No application code was modified to produce this** (Phase 1 rule honored). Every audit claim is grounded in the actual source at the current commit (`main`). Where a statement is reasoning rather than a code fact, it is marked **(inferred)**. Competitor analysis in Phase 2 is **general industry knowledge, not independently re-verified with live sources this session** — no fabricated metrics or pricing are stated.
 
 ---
