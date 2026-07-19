@@ -10,6 +10,8 @@ import {
   BarChart3,
   Users,
   Shield,
+  ShieldAlert,
+  Waypoints,
   Brain,
   Settings,
 } from "lucide-react";
@@ -32,8 +34,15 @@ export const DASHBOARD_NAV: NavSection[] = [
     label: "Overview",
     items: [
       { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { title: "AI Insights", href: "/dashboard/ai", icon: Brain },
       { title: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Intelligence",
+    items: [
+      { title: "AI Insights", href: "/dashboard/ai", icon: Brain },
+      { title: "Risk Radar", href: "/dashboard/risk", icon: ShieldAlert, badge: "New" },
+      { title: "Route Optimizer", href: "/dashboard/optimizer", icon: Waypoints, badge: "New" },
     ],
   },
   {
