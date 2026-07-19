@@ -1,7 +1,7 @@
 import { HUB_LIST, lngToX, latToY } from "@/lib/geo";
 import { stringToSeed } from "@/lib/hash";
 import type { Shipment, Warehouse } from "@/lib/db/types";
-import type { SimNode, SimRoute, ShipmentStatus } from "@/types";
+import type { SimNode, SimRoute, ShipmentStatus, TransportMode } from "@/types";
 
 /**
  * Derives the logistics network graph (nodes + routes) from the user's real
@@ -114,6 +114,87 @@ export function buildNetworkModel(shipments: Shipment[], warehouses: Warehouse[]
       shipmentRef: s.reference,
       progress: (i * 0.13) % 1,
       healthScore: STATUS_HEALTH[s.status],
+    };
+  });
+
+  return { routes, nodes: Array.from(nodeMap.values()) };
+}
+
+// ---- Geospatial model (real lat/lng) for the MapLibre Digital Twin ----------
+
+export interface GeoPointLL {
+  lat: number;
+  lng: number;
+  label: string;
+}
+
+export interface GeoRoute {
+  id: string;
+  shipmentRef: string;
+  mode: TransportMode;
+  status: ShipmentStatus;
+  healthScore: number;
+  from: GeoPointLL;
+  to: GeoPointLL;
+}
+
+export interface GeoNode extends GeoPointLL {
+  id: string;
+  type: "warehouse" | "city";
+}
+
+export interface GeoModel {
+  routes: GeoRoute[];
+  nodes: GeoNode[];
+}
+
+/**
+ * Builds the network in real geographic coordinates (lat/lng) for the Digital
+ * Twin. Coordinates are derived deterministically from place names via
+ * `geoForName`, so they're stable and consistent with the schematic map — no
+ * geocoding API/secret required.
+ */
+export function buildGeoModel(shipments: Shipment[], warehouses: Warehouse[]): GeoModel {
+  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
+  const active = shipments.filter((s) => ACTIVE_STATUSES.has(s.status));
+  const nodeMap = new Map<string, GeoNode>();
+
+  const upsert = (label: string, isWarehouse: boolean): GeoNode => {
+    const existing = nodeMap.get(label);
+    if (existing) {
+      if (isWarehouse && existing.type !== "warehouse") {
+        const promoted: GeoNode = { ...existing, type: "warehouse" };
+        nodeMap.set(label, promoted);
+        return promoted;
+      }
+      return existing;
+    }
+    const { lat, lng } = geoForName(label);
+    const node: GeoNode = {
+      id: `geo-${stringToSeed(label).toString(36)}`,
+      label,
+      lat,
+      lng,
+      type: isWarehouse ? "warehouse" : "city",
+    };
+    nodeMap.set(label, node);
+    return node;
+  };
+
+  const routes: GeoRoute[] = active.map((s) => {
+    const warehouse = warehouseById.get(s.originWarehouseId);
+    const originLabel = warehouse ? warehouse.name : "Origin";
+    const destLabel = s.destinationCity || "Destination";
+    const from = upsert(originLabel, true);
+    const to = upsert(destLabel, false);
+    return {
+      id: `georoute-${s.id}`,
+      shipmentRef: s.reference,
+      mode: s.mode,
+      status: s.status,
+      healthScore: STATUS_HEALTH[s.status],
+      from: { lat: from.lat, lng: from.lng, label: from.label },
+      to: { lat: to.lat, lng: to.lng, label: to.label },
     };
   });
 

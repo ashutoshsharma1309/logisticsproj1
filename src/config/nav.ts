@@ -6,6 +6,7 @@ import {
   Truck,
   Blocks,
   Radar,
+  Globe2,
   BarChart3,
   Users,
   Shield,
@@ -46,6 +47,7 @@ export const DASHBOARD_NAV: NavSection[] = [
   {
     label: "Decentralized Network",
     items: [
+      { title: "Digital Twin", href: "/dashboard/twin", icon: Globe2, badge: "New" },
       { title: "Ledger Explorer", href: "/dashboard/ledger", icon: Blocks },
       { title: "Simulation", href: "/dashboard/simulation", icon: Radar, badge: "Live" },
     ],
