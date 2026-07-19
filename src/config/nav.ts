@@ -12,6 +12,7 @@ import {
   Shield,
   ShieldAlert,
   Waypoints,
+  FileBarChart,
   Brain,
   Settings,
 } from "lucide-react";
@@ -43,6 +44,7 @@ export const DASHBOARD_NAV: NavSection[] = [
       { title: "AI Insights", href: "/dashboard/ai", icon: Brain },
       { title: "Risk Radar", href: "/dashboard/risk", icon: ShieldAlert, badge: "New" },
       { title: "Route Optimizer", href: "/dashboard/optimizer", icon: Waypoints, badge: "New" },
+      { title: "Reports", href: "/dashboard/reports", icon: FileBarChart, badge: "New" },
     ],
   },
   {
