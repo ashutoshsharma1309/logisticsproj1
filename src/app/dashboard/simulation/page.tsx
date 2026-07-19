@@ -38,12 +38,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCollection } from "@/hooks/use-collection";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useSimulation } from "@/hooks/use-simulation";
-import { HUB_LIST, lngToX, latToY } from "@/lib/geo";
-import { stringToSeed } from "@/lib/hash";
+import { buildNetworkModel } from "@/lib/network";
 import { MODE_META, integrityVariant } from "@/config/status";
 import { cn, formatDateTime, formatNumber } from "@/lib/utils";
 import type {
-  ShipmentStatus,
   SimNode,
   SimRoute,
   TransportMode,
@@ -59,121 +57,10 @@ const MODE_ICON: Record<TransportMode, React.ElementType> = {
 
 const SPEEDS = [0.5, 1, 2, 4] as const;
 
-/** Statuses that are still "in motion" and worth animating on the network. */
-const ACTIVE_STATUSES: ReadonlySet<ShipmentStatus> = new Set<ShipmentStatus>([
-  "pending",
-  "in_transit",
-  "at_warehouse",
-  "customs",
-  "out_for_delivery",
-  "delayed",
-  "exception",
-]);
-
-/** Deterministic health score derived purely from a shipment's status. */
-const STATUS_HEALTH: Record<ShipmentStatus, number> = {
-  pending: 72,
-  in_transit: 88,
-  at_warehouse: 82,
-  customs: 76,
-  out_for_delivery: 92,
-  delivered: 100,
-  delayed: 44,
-  exception: 28,
-};
-
 type Selection =
   | { type: "route"; id: string }
   | { type: "node"; id: string }
   | null;
-
-/**
- * Map any user-entered place name to a stable pseudo-coordinate near a real
- * hub. Warehouses/destinations are free-text without coordinates, so we hash
- * the name to pick a hub and apply a small deterministic offset — identical
- * names always land on the same point, so the network is reproducible.
- */
-function pointForName(name: string): { x: number; y: number } {
-  const seed = stringToSeed(name);
-  const hub = HUB_LIST[seed % HUB_LIST.length]!;
-  const offLng = (((seed >>> 7) % 1000) / 1000 - 0.5) * 12; // ±6°
-  const offLat = (((seed >>> 17) % 1000) / 1000 - 0.5) * 10; // ±5°
-  return { x: lngToX(hub.lng + offLng), y: latToY(hub.lat + offLat) };
-}
-
-function shortLabel(value: string): string {
-  return value.split(",")[0]!.trim();
-}
-
-interface SimModel {
-  routes: SimRoute[];
-  nodes: SimNode[];
-}
-
-/** Build the network graph (routes + nodes) from the user's real shipments. */
-function buildModel(shipments: Shipment[], warehouses: Warehouse[]): SimModel {
-  const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
-  const active = shipments.filter((s) => ACTIVE_STATUSES.has(s.status));
-
-  const nodeMap = new Map<string, SimNode>();
-  const upsertNode = (label: string, isWarehouse: boolean): SimNode => {
-    const existing = nodeMap.get(label);
-    if (existing) {
-      if (isWarehouse && !existing.glow) {
-        const promoted: SimNode = {
-          ...existing,
-          type: "warehouse",
-          glow: true,
-        };
-        nodeMap.set(label, promoted);
-        return promoted;
-      }
-      return existing;
-    }
-    const point = pointForName(label);
-    const node: SimNode = {
-      id: `node-${stringToSeed(label).toString(36)}`,
-      type: isWarehouse ? "warehouse" : "city",
-      label,
-      x: point.x,
-      y: point.y,
-      glow: isWarehouse,
-    };
-    nodeMap.set(label, node);
-    return node;
-  };
-
-  const routes: SimRoute[] = active.map((s, i) => {
-    const warehouse = warehouseById.get(s.originWarehouseId);
-    const originLabel = warehouse ? warehouse.name : "Origin";
-    const destLabel = s.destinationCity || "Destination";
-
-    const fromNode = upsertNode(originLabel, true);
-    const toNode = upsertNode(destLabel, false);
-
-    const fromPoint = { x: fromNode.x, y: fromNode.y };
-    const toPoint = { x: toNode.x, y: toNode.y };
-    const mx = (fromPoint.x + toPoint.x) / 2;
-    const my = (fromPoint.y + toPoint.y) / 2;
-    const dist = Math.hypot(toPoint.x - fromPoint.x, toPoint.y - fromPoint.y);
-    const lift = 5 + dist * 0.28;
-
-    return {
-      id: `route-${s.id}`,
-      from: shortLabel(originLabel),
-      to: shortLabel(destLabel),
-      mode: s.mode,
-      fromPoint,
-      toPoint,
-      controlPoint: { x: mx, y: Math.max(2, my - lift) },
-      shipmentRef: s.reference,
-      progress: (i * 0.13) % 1,
-      healthScore: STATUS_HEALTH[s.status],
-    };
-  });
-
-  return { routes, nodes: Array.from(nodeMap.values()) };
-}
 
 function StatChip({
   icon: Icon,
@@ -590,7 +477,7 @@ export default function SimulationPage() {
   const { items: warehouses } = useCollection("warehouses");
 
   const { routes, nodes } = React.useMemo(
-    () => buildModel(shipments, warehouses),
+    () => buildNetworkModel(shipments, warehouses),
     [shipments, warehouses],
   );
 

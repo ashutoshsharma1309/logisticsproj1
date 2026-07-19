@@ -1,4 +1,4 @@
-import type { Shipment, Vehicle } from "@/lib/db/types";
+import type { Shipment } from "@/lib/db/types";
 import type { TransportMode } from "@/types";
 
 export interface CostBreakdown {
@@ -37,10 +37,6 @@ const CO2_FACTOR: Record<TransportMode, number> = {
 export function shipmentEmissions(s: Pick<Shipment, "weightKg" | "distanceKm" | "mode">): number {
   const tonnes = num(s.weightKg) / 1000;
   return Math.round(tonnes * num(s.distanceKm) * (CO2_FACTOR[s.mode] ?? 0.1) * 10) / 10;
-}
-
-export function vehicleRunningCost(v: Pick<Vehicle, "monthlyMaintenanceCost" | "fuelCostPerKm" | "odometerKm">): number {
-  return num(v.monthlyMaintenanceCost);
 }
 
 export function nextReference(existingCount: number): string {
